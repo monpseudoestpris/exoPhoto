@@ -71,8 +71,46 @@ App.Views.Coach = (function () {
         return tags.indexOf('variante') >= 0;
     }
 
+    function _buildEssentialTitle(exercise) {
+        var topic = App.ExerciseStore.normalizeTopic(exercise.topic, exercise.subject);
+        if (topic && !App.ExerciseStore.isUnclassifiedTopic(topic)) {
+            return 'L\'essentiel · ' + topic;
+        }
+        return 'L\'essentiel · ' + (exercise.title || 'Exercice');
+    }
+
+    function _snippet(text, maxLen) {
+        var value = String(text || '').replace(/\s+/g, ' ').trim();
+        if (!value) return '';
+        var limit = maxLen || 160;
+        if (value.length <= limit) return value;
+        return value.slice(0, limit - 3).replace(/\s+\S*$/, '').trim() + '...';
+    }
+
+    function renderMiniCourses(courses) {
+        if (!courses || !courses.length) {
+            return '<div class="empty-state">Aucun petit cours sauvegarde pour l\'instant.</div>';
+        }
+
+        return '<div class="mini-course-list">' + courses.map(function (course) {
+            return '<article class="mini-course-item" data-mini-course-id="' + App.UI.escapeHtml(course.id) + '">' +
+                '<div class="mini-course-head">' +
+                    '<h4>' + App.UI.escapeHtml(course.title || 'Petit cours') + '</h4>' +
+                    '<button class="ghost mini-course-delete" data-mini-course-delete="' + App.UI.escapeHtml(course.id) + '">Supprimer</button>' +
+                '</div>' +
+                '<div class="exercise-meta">' +
+                    '<div>' + App.UI.escapeHtml(course.subject || 'Autre') + ' · ' + App.UI.escapeHtml(course.topic || App.ExerciseStore.defaultTopic()) + '</div>' +
+                    '<div>Maj ' + App.UI.formatDate(course.updatedAt || course.createdAt) + '</div>' +
+                '</div>' +
+                '<p class="mini-course-snippet">' + App.UI.escapeHtml(_snippet(course.base, 180)) + '</p>' +
+            '</article>';
+        }).join('') + '</div>';
+    }
+
     function render(container) {
-        App.DB.getExercises().then(function (exercises) {
+        Promise.all([App.DB.getExercises(), App.DB.getMiniCourses()]).then(function (results) {
+            var exercises = results[0] || [];
+            var miniCoursesAll = results[1] || [];
             if (!exercises.length) {
                 container.innerHTML = '<div class="page-stack"><section class="hero"><h1>Prof IA</h1><p>Commence par enregistrer au moins un exercice dans la bibliotheque.</p><div class="hero-actions"><a class="button-link" href="#/capture">Scanner un exercice</a><a class="button-link secondary" href="#/library">Ouvrir la bibliotheque</a></div></section></div>';
                 return;
@@ -91,6 +129,9 @@ App.Views.Coach = (function () {
             });
             active = exercises.find(function (ex) { return ex.id === active.id; }) || exercises[0];
             var isVariant = _isVariantExercise(active);
+            var miniCourses = miniCoursesAll.filter(function (course) {
+                return course.subject === active.subject && course.topic === active.topic;
+            });
 
             var attempt = _loadAttempt(active.id);
             var chat = _loadChat(active.id);
@@ -149,6 +190,13 @@ App.Views.Coach = (function () {
                                 '<button data-coach-preset-question="Explique moi l\'enonce, je comprends pas tout" class="ghost">Explique moi l\'enonce, je comprends pas tout</button>' +
                                 '<small class="muted">Raccourci: Ctrl+Entrée</small>' +
                             '</div>' +
+                            '<section class="mini-course-corner">' +
+                                '<div class="coach-list-head">' +
+                                    '<h3>Coin petits cours</h3>' +
+                                    '<small class="muted">' + miniCourses.length + ' sauvegarde(s)</small>' +
+                                '</div>' +
+                                renderMiniCourses(miniCourses) +
+                            '</section>' +
                             '<div id="coach-chat" class="coach-chat">' + renderChat(chat) + '</div>' +
                         '</section>' +
                     '</section>' +
@@ -160,6 +208,7 @@ App.Views.Coach = (function () {
                             '</header>' +
                             '<div id="coach-modal-content" class="coach-modal-content math-content"></div>' +
                             '<footer class="coach-modal-actions">' +
+                                '<button id="coach-modal-save-essential" class="secondary" style="display:none;">Sauver dans Petits cours</button>' +
                                 '<button id="coach-modal-copy" class="secondary">Copier</button>' +
                                 '<button id="coach-modal-close">Fermer</button>' +
                             '</footer>' +
@@ -167,7 +216,7 @@ App.Views.Coach = (function () {
                     '</div>' +
                 '</div>';
 
-            bindEvents(container, exercises, active, chat);
+            bindEvents(container, exercises, active, chat, miniCourses);
             App.UI.renderMath(container);
 
             var pendingAction = localStorage.getItem(PENDING_ACTION_KEY);
@@ -196,7 +245,9 @@ App.Views.Coach = (function () {
         }).join('');
     }
 
-    function bindEvents(container, exercises, active, chat) {
+    function bindEvents(container, exercises, active, chat, miniCourses) {
+        var pendingEssentialCourse = null;
+
         container.querySelectorAll('[data-coach-ex]').forEach(function (el) {
             el.addEventListener('click', function () {
                 _setActive(el.getAttribute('data-coach-ex'));
@@ -265,6 +316,7 @@ App.Views.Coach = (function () {
         var closeBtn = container.querySelector('#coach-modal-close');
         var closeXBtn = container.querySelector('#coach-modal-close-x');
         var copyBtn = container.querySelector('#coach-modal-copy');
+        var saveEssentialBtn = container.querySelector('#coach-modal-save-essential');
 
         function closeModal() {
             if (!modalRoot) return;
@@ -272,13 +324,22 @@ App.Views.Coach = (function () {
             modalRoot.setAttribute('aria-hidden', 'true');
         }
 
-        function openModal(text) {
+        function openModal(text, opts) {
+            opts = opts || {};
             if (!modalRoot || !modalContent) return;
-            if (modalTitle) modalTitle.textContent = 'Reponse du Prof IA';
+            if (modalTitle) modalTitle.textContent = opts.title || 'Reponse du Prof IA';
             modalContent.textContent = text || '';
             modalRoot.classList.add('active');
             modalRoot.setAttribute('aria-hidden', 'false');
             if (copyBtn) copyBtn.disabled = false;
+            if (saveEssentialBtn) {
+                if (opts.allowSaveEssential && pendingEssentialCourse) {
+                    saveEssentialBtn.style.display = 'inline-flex';
+                    saveEssentialBtn.disabled = false;
+                } else {
+                    saveEssentialBtn.style.display = 'none';
+                }
+            }
             App.UI.renderMath(modalContent);
         }
 
@@ -296,6 +357,7 @@ App.Views.Coach = (function () {
             modalRoot.classList.add('active');
             modalRoot.setAttribute('aria-hidden', 'false');
             if (copyBtn) copyBtn.disabled = true;
+            if (saveEssentialBtn) saveEssentialBtn.style.display = 'none';
         }
 
         if (closeBtn) closeBtn.addEventListener('click', closeModal);
@@ -312,6 +374,22 @@ App.Views.Coach = (function () {
                     App.UI.showToast('Reponse copitee', 'success');
                 }).catch(function () {
                     App.UI.showToast('Copie impossible', 'error');
+                });
+            });
+        }
+
+        if (saveEssentialBtn) {
+            saveEssentialBtn.addEventListener('click', function () {
+                if (!pendingEssentialCourse) return;
+                saveEssentialBtn.disabled = true;
+                App.DB.saveMiniCourse(pendingEssentialCourse).then(function () {
+                    pendingEssentialCourse = null;
+                    saveEssentialBtn.style.display = 'none';
+                    App.UI.showToast('Petit cours sauvegarde dans Petits cours', 'success');
+                    App.Router.render();
+                }).catch(function () {
+                    saveEssentialBtn.disabled = false;
+                    App.UI.showToast('Sauvegarde impossible', 'error');
                 });
             });
         }
@@ -379,10 +457,32 @@ App.Views.Coach = (function () {
             }).then(function (txt) {
                 var answer = txt || 'Je n\'ai pas pu produire une reponse exploitable.';
                 push('assistant', answer);
+
+                if (action === 'essential' && answer.indexOf('Erreur IA:') !== 0) {
+                    var now = new Date().toISOString();
+                    pendingEssentialCourse = {
+                        id: App.DB.nextId('mini-course'),
+                        subject: App.ExerciseStore.normalizeSubject(active.subject),
+                        topic: App.ExerciseStore.normalizeTopic(active.topic, active.subject),
+                        title: _buildEssentialTitle(active),
+                        base: answer,
+                        sourceExerciseId: active.id,
+                        createdAt: now,
+                        updatedAt: now
+                    };
+                    openModal(answer, {
+                        title: 'L\'essentiel',
+                        allowSaveEssential: true
+                    });
+                    return;
+                }
+
+                pendingEssentialCourse = null;
                 openModal(answer);
             }).catch(function (err) {
                 var errorText = 'Erreur IA: ' + (err.message || String(err));
                 push('assistant', errorText);
+                pendingEssentialCourse = null;
                 openModal(errorText);
             }).finally(function () {
                 buttons.forEach(function (b) { b.disabled = false; });
@@ -403,6 +503,28 @@ App.Views.Coach = (function () {
                 runAction('essential');
             });
         }
+
+        container.querySelectorAll('[data-mini-course-delete]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var id = btn.getAttribute('data-mini-course-delete');
+                if (!id) return;
+                if (!window.confirm('Supprimer ce petit cours ?')) return;
+                App.DB.deleteMiniCourse(id).then(function () {
+                    App.UI.showToast('Petit cours supprime', 'success');
+                    App.Router.render();
+                });
+            });
+        });
+
+        container.querySelectorAll('[data-mini-course-id]').forEach(function (el) {
+            el.addEventListener('click', function (event) {
+                if (event.target && event.target.getAttribute('data-mini-course-delete')) return;
+                var id = el.getAttribute('data-mini-course-id');
+                var selected = (miniCourses || []).find(function (course) { return course.id === id; });
+                if (!selected) return;
+                openModal(selected.base || '');
+            });
+        });
 
         container.querySelectorAll('[data-coach-preset-question]').forEach(function (btn) {
             btn.addEventListener('click', function () {

@@ -8,6 +8,7 @@ var App = window.App || {};
     App.Router.register('#/library', App.Views.Library.render);
     App.Router.register('#/exercise', App.Views.Exercise.render);
     App.Router.register('#/coach', App.Views.Coach.render);
+    App.Router.register('#/courses', App.Views.Courses.render);
     App.Router.register('#/settings', App.Views.Settings.render);
 
     document.addEventListener('DOMContentLoaded', function () {

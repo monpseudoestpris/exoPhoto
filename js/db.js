@@ -2,7 +2,7 @@ var App = window.App || {};
 
 App.DB = (function () {
     var DB_NAME = 'ExoPhotoDB';
-    var DB_VERSION = 2;
+    var DB_VERSION = 3;
     var db = null;
 
     function withStore(storeName, mode, action) {
@@ -43,6 +43,14 @@ App.DB = (function () {
                     if (!existing.indexNames.contains('topic')) {
                         existing.createIndex('topic', 'topic', { unique: false });
                     }
+                }
+
+                if (!database.objectStoreNames.contains('miniCourses')) {
+                    var miniCourses = database.createObjectStore('miniCourses', { keyPath: 'id' });
+                    miniCourses.createIndex('subject', 'subject', { unique: false });
+                    miniCourses.createIndex('topic', 'topic', { unique: false });
+                    miniCourses.createIndex('createdAt', 'createdAt', { unique: false });
+                    miniCourses.createIndex('updatedAt', 'updatedAt', { unique: false });
                 }
             };
 
@@ -141,6 +149,26 @@ App.DB = (function () {
         return remove('exercises', id);
     }
 
+    function saveMiniCourse(course) {
+        return put('miniCourses', course);
+    }
+
+    function getMiniCourse(id) {
+        return get('miniCourses', id);
+    }
+
+    function getMiniCourses() {
+        return getAll('miniCourses').then(function (items) {
+            return items.sort(function (a, b) {
+                return String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt));
+            });
+        });
+    }
+
+    function deleteMiniCourse(id) {
+        return remove('miniCourses', id);
+    }
+
     return {
         open: open,
         nextId: nextId,
@@ -152,6 +180,10 @@ App.DB = (function () {
         getExercise: getExercise,
         getExercises: getExercises,
         getExercisesBySubject: getExercisesBySubject,
-        deleteExercise: deleteExercise
+        deleteExercise: deleteExercise,
+        saveMiniCourse: saveMiniCourse,
+        getMiniCourse: getMiniCourse,
+        getMiniCourses: getMiniCourses,
+        deleteMiniCourse: deleteMiniCourse
     };
 })();

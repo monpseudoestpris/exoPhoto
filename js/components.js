@@ -16,6 +16,7 @@ App.UI = (function () {
         upload: '<path d="M12 15V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/>',
         book: '<path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2V4Z"/><path d="M9 4v16"/>',
         teacher: '<path d="m12 4 9 4-9 4-9-4 9-4Z"/><path d="M5 10.5V14c0 1.7 3.1 3 7 3s7-1.3 7-3v-3.5"/>',
+        note: '<path d="M7 3h10a2 2 0 0 1 2 2v14l-4-3-4 3-4-3-4 3V5a2 2 0 0 1 2-2h2"/><path d="M8 8h8M8 11h8"/>',
         settings: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M3 12h2.5M18.5 12H21M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',
         moon: '<path d="M21 12.8A8 8 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8Z"/>',
         collapse: '<path d="m9 6-4 6 4 6"/><path d="m15 6 4 6-4 6"/>',
@@ -55,6 +56,7 @@ App.UI = (function () {
                     navLink('#/capture', 'Capture', 'camera') +
                     navLink('#/library', 'Bibliotheque', 'book') +
                     navLink('#/coach', 'Prof IA', 'teacher') +
+                    navLink('#/courses', 'Petits cours', 'note') +
                     navLink('#/settings', 'Parametres', 'settings') +
                 '</div>' +
                 '<div class="nav-actions">' +

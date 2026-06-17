@@ -1,5 +1,5 @@
-var APP_VERSION = 'v43';
-var CACHE_NAME = 'exophoto-v43';
+var APP_VERSION = 'v47';
+var CACHE_NAME = 'exophoto-v47';
 
 var ASSETS = [
   './',
@@ -26,6 +26,7 @@ var ASSETS = [
   './js/views/library.js',
   './js/views/exercise.js',
   './js/views/coach.js',
+  './js/views/courses.js',
   './js/views/settings.js',
   './js/app.js'
 ];

@@ -1185,6 +1185,83 @@ body[data-nav-collapsed="true"] .nav-action {
     margin-top: -0.15rem;
 }
 
+.mini-course-corner {
+    margin-top: 0.75rem;
+    padding: 0.85rem;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface-strong) 78%, transparent 22%);
+}
+
+.mini-course-corner h3 {
+    margin: 0;
+}
+
+.mini-course-list {
+    margin-top: 0.6rem;
+    display: grid;
+    gap: 0.6rem;
+}
+
+.mini-course-item {
+    padding: 0.7rem 0.8rem;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 84%, transparent 16%);
+    cursor: pointer;
+}
+
+.mini-course-item:hover {
+    border-color: rgba(216, 178, 74, 0.45);
+}
+
+.mini-course-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.mini-course-head h4 {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.3;
+}
+
+.mini-course-delete {
+    min-height: 34px;
+    padding: 0.25rem 0.6rem;
+}
+
+.mini-course-snippet {
+    margin: 0.45rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.course-reader-card {
+    padding: 1.4rem;
+}
+
+.course-reader-card h2 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+.course-reader-body {
+    min-height: min(64dvh, 760px);
+    font-size: 1.02rem;
+    line-height: 1.7;
+    overflow: auto;
+}
+
+.course-library-card {
+    padding-top: 1rem;
+}
+
+.course-library-list {
+    max-height: none;
+}
+
 .coach-chat {
     margin-top: 0.7rem;
     display: grid;
@@ -1440,7 +1517,7 @@ body[data-nav-collapsed="true"] .nav-action {
 
     .nav-links {
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 0.45rem;
         overflow: visible;
     }

@@ -1,3 +1,3 @@
 var App = window.App || {};
-App.VERSION = 'v43';
+App.VERSION = 'v47';
 window.App = App;
