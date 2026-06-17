@@ -56,6 +56,7 @@ App.AICoach = (function () {
             hint: 'Donne un indice progressif sans resoudre entierement.',
             method: 'Donne une methode de resolution et un plan d\'attaque.',
             review: 'Analyse la tentative de l\'eleve: ce qui est correct, ce qui bloque, puis donne le prochain pas utile.',
+            essential: 'Fais une synthese ultra claire et courte de l\'essentiel du chapitre ou du theme, avec des analogies simples et des exemples concrets. Priorite: comprendre vite, retenir l\'idee centrale, puis savoir quoi faire.',
             custom: 'Reponds a la question de l\'eleve en mode professeur.'
         };
 
@@ -188,7 +189,11 @@ App.AICoach = (function () {
     function ask(opts) {
         var provider = (opts && opts.provider) || _preferred();
         var userPrompt = _buildUserPrompt(opts || {});
+        return _dispatch(provider, userPrompt);
+    }
 
+    function _dispatch(provider, userPrompt) {
+        provider = provider || _preferred();
         if (provider === 'deepseek') {
             var dk = App.ProviderKeys.getKey('deepseek');
             if (!dk) return Promise.reject(new Error('Cle DeepSeek absente ou verrouillee'));
@@ -209,8 +214,93 @@ App.AICoach = (function () {
         return _callMistral(mk, userPrompt);
     }
 
+    function _extractJsonObject(text) {
+        var raw = String(text || '').trim();
+        if (!raw) throw new Error('Reponse vide');
+
+        try {
+            return JSON.parse(raw);
+        } catch (e) {}
+
+        var start = raw.indexOf('{');
+        var end = raw.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return JSON.parse(raw.slice(start, end + 1));
+        }
+        throw new Error('JSON introuvable dans la reponse IA');
+    }
+
+    function generateVariant(opts) {
+        opts = opts || {};
+        var provider = opts.provider || _preferred();
+        var prompt = [
+            'Genere une variante d\'exercice a bosser pour un eleve.',
+            'Contrainte: meme matiere et meme sujet, niveau similaire, enonce differente.',
+            'Ne fournis pas la solution.',
+            'Retourne UNIQUEMENT du JSON avec ce format:',
+            '{"title":"...","subject":"...","topic":"...","statement":"...","instructions":"...","difficulty":"Facile|Moyen|Difficile"}',
+            '',
+            'Titre source: ' + (opts.exerciseTitle || 'Exercice'),
+            'Matiere source: ' + (opts.subject || 'Autre'),
+            'Sujet source: ' + (opts.topic || 'A classer'),
+            'Niveau: ' + (opts.gradeLevel || 'College'),
+            'Difficulte source: ' + (opts.difficulty || 'Moyen'),
+            '',
+            'Consignes source:',
+            opts.instructions || '(aucune)',
+            '',
+            'Enonce source:',
+            opts.statement || ''
+        ].join('\n');
+
+        return _dispatch(provider, prompt).then(function (text) {
+            var parsed = _extractJsonObject(text);
+            return {
+                title: String(parsed.title || '').trim(),
+                subject: String(opts.subject || 'Autre').trim(),
+                topic: String(opts.topic || '').trim(),
+                statement: String(parsed.statement || '').trim(),
+                instructions: String(parsed.instructions || '').trim(),
+                difficulty: String(parsed.difficulty || opts.difficulty || 'Moyen').trim()
+            };
+        });
+    }
+
+    function generateExercise(opts) {
+        opts = opts || {};
+        var provider = opts.provider || _preferred();
+        var prompt = [
+            'Genere un exercice complet a bosser.',
+            'Description souhaitee: ' + (opts.description || 'Exercice').trim(),
+            '',
+            'Niveau: ' + (opts.gradeLevel || 'College'),
+            'Difficulte souhaitee: ' + (opts.difficulty || 'Moyen'),
+            '',
+            'Ne fournis pas la solution.',
+            'Retourne UNIQUEMENT du JSON avec ce format (valide et parsable):',
+            '{"title":"...","subject":"...","topic":"...","statement":"...","instructions":"...","difficulty":"Facile|Moyen|Difficile"}',
+            '',
+            'Note: subject doit etre une matiere (Mathematiques, Francais, Anglais, Physique, Sciences, etc.)',
+            'topic doit etre un sujet specifique (ex: "Derivees", "Conjugaison", "Present Simple")'
+        ].join('\n');
+
+        return _dispatch(provider, prompt).then(function (text) {
+            var parsed = _extractJsonObject(text);
+            return {
+                title: String(parsed.title || 'Exercice genere').trim(),
+                subject: String(parsed.subject || 'Autre').trim(),
+                topic: String(parsed.topic || 'A classer').trim(),
+                statement: String(parsed.statement || '').trim(),
+                instructions: String(parsed.instructions || '').trim(),
+                difficulty: String(parsed.difficulty || opts.difficulty || 'Moyen').trim()
+            };
+        });
+    }
+
     return {
         ask: ask,
+        generateVariant: generateVariant,
+        generateExercise: generateExercise,
         resolveModelName: resolveModelName
     };
 })();

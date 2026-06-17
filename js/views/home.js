@@ -16,40 +16,61 @@ App.Views.Home = (function () {
             if (activeScan) App.ScanStore.setActiveScanId(activeScan.id);
 
             container.innerHTML =
-                '<div class="page-stack">' +
-                    '<section class="hero">' +
-                        '<h1>Photo, OCR, exos. Simple et rapide.</h1>' +
-                        '<p>Commence ici: prends une photo ou importe une image. Ensuite, retrouve tes exos en un geste.</p>' +
-                        '<div class="hero-actions">' +
-                            '<a class="button-link cta-prominent" href="#/capture">Prendre une photo / Upload</a>' +
-                            '<a class="button-link secondary" href="#/library">Aller aux exercices</a>' +
+                '<div class="page-stack home-stack">' +
+                    '<header class="home-head">' +
+                        '<div class="home-head-text">' +
+                            '<h1>Tes exos, en un geste</h1>' +
+                            '<p class="muted">Scanne une feuille, bosse avec le Prof IA, génère des variantes.</p>' +
                         '</div>' +
-                        '<div class="quick-exercise-grid">' +
-                            '<article class="quick-card">' +
-                                '<h3>Reprendre vite</h3>' +
-                                '<div class="quick-chip-row">' + renderRecentExercises(recentExercises) + '</div>' +
-                            '</article>' +
-                            '<article class="quick-card">' +
-                                '<h3>Parcours express</h3>' +
-                                '<div class="quick-stack">' +
-                                    '<a class="button-link ghost" href="#/library">Bibliotheque complete</a>' +
-                                    '<a class="button-link ghost" href="#/coach">Prof IA</a>' +
-                                '</div>' +
-                            '</article>' +
+                        '<div class="home-stats-inline">' +
+                            statChip('book', String(exercises.length), 'exos') +
+                            statChip('camera', String(scans.length), 'scans') +
+                            statChip('sparkles', String(uniqueSubjects(exercises).length), 'matieres') +
                         '</div>' +
-                        '<div class="summary-grid">' +
-                            summaryCard('Scans', String(scans.length)) +
-                            summaryCard('Exercices', String(exercises.length)) +
-                            summaryCard('Matieres', String(uniqueSubjects(exercises).length)) +
+                    '</header>' +
+
+                    '<a class="primary-action" href="#/capture">' +
+                        '<span class="primary-action-icons">' + App.UI.icon('camera') + App.UI.icon('upload') + '</span>' +
+                        '<span class="primary-action-text">' +
+                            '<span class="primary-action-title">Scanner ou importer</span>' +
+                            '<span class="primary-action-sub">Prends une photo ou importe une image pour creer un exo.</span>' +
+                        '</span>' +
+                        '<span class="primary-action-arrow">' + App.UI.icon('arrow') + '</span>' +
+                    '</a>' +
+
+                    '<section class="home-section">' +
+                        '<div class="home-section-head">' +
+                            '<span class="section-icon">' + App.UI.icon('teacher') + '</span>' +
+                            '<h2>Bosser sur un exo</h2>' +
+                            '<a class="text-link" href="#/library">Tout voir' + App.UI.icon('arrow') + '</a>' +
+                        '</div>' +
+                        '<div class="exo-quick-grid">' + renderExoTiles(recentExercises) + '</div>' +
+                    '</section>' +
+
+                    '<section class="home-section">' +
+                        '<div class="home-section-head">' +
+                            '<span class="section-icon">' + App.UI.icon('sparkles') + '</span>' +
+                            '<h2>Generer des variantes</h2>' +
+                        '</div>' +
+                        '<div class="variant-cta-card">' +
+                            '<p class="muted">Choisis un exercice et cree des variantes pour t\'entrainer a l\'infini.</p>' +
+                            '<a class="button-link cta-prominent" href="#/library">' + App.UI.icon('sparkles') + 'Choisir un exo</a>' +
                         '</div>' +
                     '</section>' +
-                    '<section class="two-col">' +
-                        '<div class="panel">' +
-                            '<h2>Scans recents</h2>' +
-                            renderTabs(scans, activeScan) +
-                        '</div>' +
-                        '<div class="scan-detail">' + renderScanDetail(activeScan) + '</div>' +
-                    '</section>' +
+
+                    (scans.length ?
+                        '<section class="home-section home-section-muted">' +
+                            '<div class="home-section-head">' +
+                                '<span class="section-icon">' + App.UI.icon('camera') + '</span>' +
+                                '<h2>Derniers scans</h2>' +
+                                '<button class="text-link danger-link" id="clear-scans-btn">' + App.UI.icon('trash') + 'Tout effacer</button>' +
+                            '</div>' +
+                            '<div class="two-col">' +
+                                '<div class="panel">' + renderTabs(scans, activeScan) + '</div>' +
+                                '<div class="scan-detail">' + renderScanDetail(activeScan) + '</div>' +
+                            '</div>' +
+                        '</section>'
+                    : '') +
                 '</div>';
 
             bindEvents(scans, activeScan);
@@ -59,8 +80,10 @@ App.Views.Home = (function () {
         });
     }
 
-    function summaryCard(label, value) {
-        return '<div class="summary-card"><span class="summary-label">' + label + '</span><span class="summary-value">' + value + '</span></div>';
+    function statChip(iconName, value, label) {
+        return '<span class="stat-chip">' + App.UI.icon(iconName) +
+            '<strong>' + App.UI.escapeHtml(value) + '</strong>' +
+            '<span>' + App.UI.escapeHtml(label) + '</span></span>';
     }
 
     function uniqueSubjects(exercises) {
@@ -69,15 +92,20 @@ App.Views.Home = (function () {
         return Object.keys(seen);
     }
 
-    function renderRecentExercises(exercises) {
+    function renderExoTiles(exercises) {
         if (!exercises.length) {
-            return '<span class="muted">Aucun exo recent. Scanne d\'abord une feuille.</span>';
+            return '<div class="empty-state">Aucun exo pour l\'instant. Scanne une feuille pour commencer.</div>';
         }
 
         return exercises.map(function (exercise) {
-            return '<a class="quick-chip" href="#/library" data-open-exercise="' + App.UI.escapeHtml(exercise.id) + '">' +
-                App.UI.escapeHtml(exercise.title || 'Exercice') +
-            '</a>';
+            var subject = exercise.subject ? App.ExerciseStore.normalizeSubject(exercise.subject) : '';
+            var topic = exercise.topic ? App.ExerciseStore.normalizeTopic(exercise.topic, subject) : '';
+            var meta = [subject, topic].filter(Boolean).join(' · ');
+            return '<button class="exo-quick-tile" data-coach-open="' + App.UI.escapeHtml(exercise.id) + '">' +
+                '<span class="exo-quick-title">' + App.UI.escapeHtml(exercise.title || 'Exercice') + '</span>' +
+                (meta ? '<span class="exo-quick-meta">' + App.UI.escapeHtml(meta) + '</span>' : '') +
+                '<span class="exo-quick-go">' + App.UI.icon('play') + '</span>' +
+            '</button>';
         }).join('');
     }
 
@@ -88,9 +116,12 @@ App.Views.Home = (function () {
 
         return '<div class="tab-strip">' + scans.map(function (scan) {
             var statusClass = scan.ocrStatus === 'error' ? 'error' : (scan.ocrStatus === 'pending' ? 'pending' : '');
-            return '<button class="tab-button ' + (activeScan && activeScan.id === scan.id ? 'active' : '') + '" data-scan-tab="' + scan.id + '">' +
-                App.UI.escapeHtml(scan.title || 'Scan') + ' ' + App.UI.badge(scan.ocrStatus, statusClass) +
-            '</button>';
+            return '<div class="scan-tab-item ' + (activeScan && activeScan.id === scan.id ? 'active' : '') + '">' +
+                '<button class="tab-button" data-scan-tab="' + scan.id + '">' +
+                    App.UI.escapeHtml(scan.title || 'Scan') + ' ' + App.UI.badge(scan.ocrStatus, statusClass) +
+                '</button>' +
+                '<button class="scan-tab-delete" data-scan-delete="' + scan.id + '" title="Supprimer ce scan" aria-label="Supprimer ce scan">' + App.UI.icon('trash') + '</button>' +
+            '</div>';
         }).join('') + '</div>';
     }
 
@@ -130,9 +161,40 @@ App.Views.Home = (function () {
             });
         });
 
-        document.querySelectorAll('[data-open-exercise]').forEach(function (link) {
-            link.addEventListener('click', function () {
-                localStorage.setItem('exophoto-library-active-exercise', link.getAttribute('data-open-exercise'));
+        document.querySelectorAll('[data-scan-delete]').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.stopPropagation();
+                var scanId = button.getAttribute('data-scan-delete');
+                var target = scans.find(function (s) { return String(s.id) === String(scanId); });
+                if (!window.confirm('Supprimer le scan "' + ((target && target.title) || 'Scan') + '" ?')) return;
+                App.DB.deleteScan(scanId).then(function () {
+                    if (String(App.ScanStore.getActiveScanId()) === String(scanId)) {
+                        var remaining = scans.filter(function (s) { return String(s.id) !== String(scanId); });
+                        App.ScanStore.setActiveScanId(remaining[0] ? remaining[0].id : null);
+                    }
+                    App.UI.showToast('Scan supprime', 'success');
+                    App.Router.render();
+                });
+            });
+        });
+
+        var clearScansBtn = document.getElementById('clear-scans-btn');
+        if (clearScansBtn) {
+            clearScansBtn.addEventListener('click', function () {
+                if (!scans.length) return;
+                if (!window.confirm('Effacer les ' + scans.length + ' scans ? Cette action est irreversible.')) return;
+                Promise.all(scans.map(function (s) { return App.DB.deleteScan(s.id); })).then(function () {
+                    App.ScanStore.setActiveScanId(null);
+                    App.UI.showToast('Scans effaces', 'success');
+                    App.Router.render();
+                });
+            });
+        }
+
+        document.querySelectorAll('[data-coach-open]').forEach(function (tile) {
+            tile.addEventListener('click', function () {
+                localStorage.setItem('exophoto-coach-active-exercise', tile.getAttribute('data-coach-open'));
+                App.Router.navigate('#/coach');
             });
         });
 

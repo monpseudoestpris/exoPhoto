@@ -1,5 +1,5 @@
-var APP_VERSION = 'v20';
-var CACHE_NAME = 'exophoto-v20';
+var APP_VERSION = 'v43';
+var CACHE_NAME = 'exophoto-v43';
 
 var ASSETS = [
   './',
@@ -18,11 +18,13 @@ var ASSETS = [
   './js/scan-store.js',
   './js/exercise-store.js',
   './js/ai-coach-client.js',
+  './js/voice-input.js',
   './js/components.js',
   './js/exercise-splitter.js',
   './js/views/home.js',
   './js/views/capture.js',
   './js/views/library.js',
+  './js/views/exercise.js',
   './js/views/coach.js',
   './js/views/settings.js',
   './js/app.js'

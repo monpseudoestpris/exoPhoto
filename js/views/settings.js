@@ -27,7 +27,7 @@ App.Views.Settings = (function () {
                             '<option value="deepseek"' + (settings.preferredProvider === 'deepseek' ? ' selected' : '') + '>DeepSeek</option>' +
                             '<option value="anthropic"' + (settings.preferredProvider === 'anthropic' ? ' selected' : '') + '>Anthropic</option>' +
                         '</select></label>' +
-                        '<label>Matiere par defaut<input id="default-subject" value="' + App.UI.escapeHtml(settings.defaultSubject) + '"></label>' +
+                        '<label>Matiere par defaut<input id="default-subject" value="' + App.UI.escapeHtml(App.ExerciseStore.normalizeSubject(settings.defaultSubject)) + '"></label>' +
                         '<label>Niveau par defaut<select id="default-grade">' + App.ExerciseStore.gradeOptions().map(function (value) {
                             return '<option value="' + App.UI.escapeHtml(value) + '"' + (value === settings.defaultGradeLevel ? ' selected' : '') + '>' + App.UI.escapeHtml(value) + '</option>';
                         }).join('') + '</select></label>' +
@@ -143,7 +143,7 @@ App.Views.Settings = (function () {
             saveSettingsBtn.addEventListener('click', function () {
                 var settings = App.Settings.load();
                 settings.preferredProvider = document.getElementById('preferred-provider').value;
-                settings.defaultSubject = document.getElementById('default-subject').value.trim() || 'Mathematiques';
+                settings.defaultSubject = App.ExerciseStore.normalizeSubject(document.getElementById('default-subject').value.trim() || 'Mathematiques');
                 settings.defaultGradeLevel = document.getElementById('default-grade').value;
                 settings.defaultDifficulty = document.getElementById('default-difficulty').value;
                 settings.imageMaxWidth = parseInt(document.getElementById('image-max-width').value, 10) || 1800;
@@ -152,6 +152,11 @@ App.Views.Settings = (function () {
                 App.Settings.save(settings);
                 App.UI.showToast('Preferences enregistrees', 'success');
             });
+        }
+
+        // Attach voice input button to default-subject
+        if (typeof App.VoiceInput !== 'undefined') {
+            App.VoiceInput.attachMicButton('default-subject');
         }
     }
 

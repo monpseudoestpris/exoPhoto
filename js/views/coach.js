@@ -6,6 +6,8 @@ App.Views.Coach = (function () {
     var CHAT_PREFIX = 'exophoto-coach-chat:';
     var ATTEMPT_PREFIX = 'exophoto-coach-attempt:';
     var MOBILE_LIST_KEY = 'exophoto-coach-mobile-list-open';
+    var PENDING_ACTION_KEY = 'exophoto-coach-pending-action';
+    var PENDING_EXERCISE_KEY = 'exophoto-coach-pending-exercise';
 
     function _isMobile() {
         return window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
@@ -49,6 +51,26 @@ App.Views.Coach = (function () {
         return localStorage.getItem(ACTIVE_KEY);
     }
 
+    function _fold(value) {
+        var out = String(value || '').toLowerCase();
+        try {
+            out = out.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        } catch (e) {}
+        return out;
+    }
+
+    function _isVariantExercise(ex) {
+        if (!ex) return false;
+        if (ex.isVariant === true) return true;
+        if (ex.sourceExerciseId) return true;
+
+        var title = _fold(ex.title || '');
+        if (title.indexOf('variante') >= 0) return true;
+
+        var tags = (ex.tags || []).map(function (t) { return _fold(t); });
+        return tags.indexOf('variante') >= 0;
+    }
+
     function render(container) {
         App.DB.getExercises().then(function (exercises) {
             if (!exercises.length) {
@@ -60,6 +82,16 @@ App.Views.Coach = (function () {
             var active = exercises.find(function (ex) { return ex.id === activeId; }) || exercises[0];
             _setActive(active.id);
 
+            exercises = exercises.map(function (ex) {
+                var subject = App.ExerciseStore.normalizeSubject(ex.subject || 'Autre');
+                return Object.assign({}, ex, {
+                    subject: subject,
+                    topic: App.ExerciseStore.normalizeTopic(ex.topic, subject)
+                });
+            });
+            active = exercises.find(function (ex) { return ex.id === active.id; }) || exercises[0];
+            var isVariant = _isVariantExercise(active);
+
             var attempt = _loadAttempt(active.id);
             var chat = _loadChat(active.id);
             var mobileListOpen = _isMobile() && _isMobileListOpen();
@@ -69,6 +101,12 @@ App.Views.Coach = (function () {
                     '<section class="hero">' +
                         '<h1>Prof IA</h1>' +
                         '<p>Travaille ta resolution ici. L\'agent explique l\'enonce, donne des indices progressifs et corrige ta tentative.</p>' +
+                        '<div class="hero-actions">' +
+                            '<button id="coach-essential-btn" class="secondary">L\'essentiel</button>' +
+                            (isVariant ? '<button id="coach-save-variant" class="secondary">Sauver la variante</button>' : '') +
+                            '<a class="button-link secondary" href="#/exercise?id=' + encodeURIComponent(active.id) + '">Retour a l\'exo</a>' +
+                            '<a class="button-link" href="#/library">Retour a la liste</a>' +
+                        '</div>' +
                     '</section>' +
                     '<section class="coach-grid ' + (mobileListOpen ? 'show-mobile-list' : 'hide-mobile-list') + '">' +
                         '<aside class="list-card coach-list">' +
@@ -79,7 +117,7 @@ App.Views.Coach = (function () {
                             '<div class="exercise-list">' + exercises.map(function (ex) {
                                 return '<div class="exercise-item ' + (ex.id === active.id ? 'active' : '') + '" data-coach-ex="' + ex.id + '">' +
                                     '<h3>' + App.UI.escapeHtml(ex.title || 'Exercice') + '</h3>' +
-                                    '<div class="exercise-meta"><div>' + App.UI.escapeHtml(ex.subject || 'Autre') + '</div><div>' + App.UI.formatDate(ex.updatedAt || ex.createdAt) + '</div></div>' +
+                                    '<div class="exercise-meta"><div>' + App.UI.escapeHtml(ex.subject || 'Autre') + ' · ' + App.UI.escapeHtml(ex.topic || App.ExerciseStore.defaultTopic()) + '</div><div>' + App.UI.formatDate(ex.updatedAt || ex.createdAt) + '</div></div>' +
                                 '</div>';
                             }).join('') + '</div>' +
                         '</aside>' +
@@ -102,6 +140,7 @@ App.Views.Coach = (function () {
                                 '<button data-coach-action="method" class="secondary">Donner la methode</button>' +
                                 '<button data-coach-action="review">Corriger ma tentative</button>' +
                             '</div>' +
+                            (isVariant ? '<div class="coach-question-actions"><button id="coach-save-variant-inline" class="secondary">Sauver la variante</button></div>' : '') +
                             '<label>Question libre (optionnel)' +
                                 '<textarea id="coach-question" rows="3" placeholder="Ex: pourquoi je dois factoriser avant de developper ?"></textarea>' +
                             '</label>' +
@@ -130,6 +169,18 @@ App.Views.Coach = (function () {
 
             bindEvents(container, exercises, active, chat);
             App.UI.renderMath(container);
+
+            var pendingAction = localStorage.getItem(PENDING_ACTION_KEY);
+            var pendingExercise = localStorage.getItem(PENDING_EXERCISE_KEY);
+            if (pendingAction === 'essential' && pendingExercise === active.id) {
+                localStorage.removeItem(PENDING_ACTION_KEY);
+                localStorage.removeItem(PENDING_EXERCISE_KEY);
+                window.setTimeout(function () {
+                    if (window.__exophotoCoachRunAction) {
+                        window.__exophotoCoachRunAction('essential');
+                    }
+                }, 0);
+            }
         });
     }
 
@@ -174,6 +225,37 @@ App.Views.Coach = (function () {
         if (attemptEl) {
             attemptEl.addEventListener('input', function () {
                 _saveAttempt(active.id, attemptEl.value);
+            });
+        }
+
+        function saveVariantNow(button) {
+            if (!button) return;
+            button.disabled = true;
+            var updated = Object.assign({}, active, {
+                isVariant: true,
+                updatedAt: new Date().toISOString()
+            });
+
+            App.DB.saveExercise(updated).then(function () {
+                App.UI.showToast('Variante sauvegardee', 'success');
+            }).catch(function (err) {
+                App.UI.showToast(err.message || 'Sauvegarde impossible', 'error');
+            }).finally(function () {
+                button.disabled = false;
+            });
+        }
+
+        var saveVariantBtn = container.querySelector('#coach-save-variant');
+        if (saveVariantBtn) {
+            saveVariantBtn.addEventListener('click', function () {
+                saveVariantNow(saveVariantBtn);
+            });
+        }
+
+        var saveVariantInlineBtn = container.querySelector('#coach-save-variant-inline');
+        if (saveVariantInlineBtn) {
+            saveVariantInlineBtn.addEventListener('click', function () {
+                saveVariantNow(saveVariantInlineBtn);
             });
         }
 
@@ -262,6 +344,7 @@ App.Views.Coach = (function () {
                 hint: 'Donne un indice',
                 method: 'Donne la methode',
                 review: 'Corrige ma tentative',
+                essential: 'L\'essentiel',
                 custom: userQuestion || 'Question libre'
             };
 
@@ -276,6 +359,9 @@ App.Views.Coach = (function () {
             buttons.forEach(function (b) { b.disabled = true; });
 
             var provider = App.Settings.get('preferredProvider') || 'deepseek';
+            if (action === 'essential') {
+                provider = 'mistral';
+            }
             var modelName = typeof App.AICoach.resolveModelName === 'function'
                 ? App.AICoach.resolveModelName(provider)
                 : provider;
@@ -284,7 +370,8 @@ App.Views.Coach = (function () {
             App.AICoach.ask({
                 action: action,
                 exerciseTitle: active.title,
-                subject: active.subject,
+                subject: App.ExerciseStore.normalizeSubject(active.subject),
+                topic: App.ExerciseStore.normalizeTopic(active.topic, active.subject),
                 statement: active.statement,
                 attempt: attempt,
                 userQuestion: userQuestion,
@@ -302,11 +389,20 @@ App.Views.Coach = (function () {
             });
         }
 
+        window.__exophotoCoachRunAction = runAction;
+
         container.querySelectorAll('[data-coach-action]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 runAction(btn.getAttribute('data-coach-action'));
             });
         });
+
+        var essentialBtn = container.querySelector('#coach-essential-btn');
+        if (essentialBtn) {
+            essentialBtn.addEventListener('click', function () {
+                runAction('essential');
+            });
+        }
 
         container.querySelectorAll('[data-coach-preset-question]').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -325,6 +421,11 @@ App.Views.Coach = (function () {
                     runAction('custom');
                 }
             });
+        }
+
+        // Attach voice input button to question textarea
+        if (typeof App.VoiceInput !== 'undefined') {
+            App.VoiceInput.attachMicButton('coach-question');
         }
     }
 

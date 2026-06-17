@@ -102,11 +102,11 @@ App.Views.Capture = (function () {
                     '<label>Titre<input class="rv-title" data-idx="' + i + '" value="' + App.UI.escapeHtml(ex.title) + '"></label>' +
                     '<label>Matière<select class="rv-subject" data-idx="' + i + '">' +
                         subjectOpts.map(function (s) {
-                            return '<option value="' + App.UI.escapeHtml(s) + '"' + (s === ex.subject ? ' selected' : '') + '>' + App.UI.escapeHtml(s) + '</option>';
+                            return '<option value="' + App.UI.escapeHtml(s) + '"' + (s === App.ExerciseStore.normalizeSubject(ex.subject) ? ' selected' : '') + '>' + App.UI.escapeHtml(s) + '</option>';
                         }).join('') +
                     '</select></label>' +
                 '</div>' +
-                '<label>Sujet<input class="rv-topic" data-idx="' + i + '" value="' + App.UI.escapeHtml(App.ExerciseStore.normalizeTopic(ex.topic)) + '" placeholder="Ex: Calcul litteral"></label>' +
+                '<label>Sujet<input class="rv-topic" data-idx="' + i + '" value="' + App.UI.escapeHtml(App.ExerciseStore.normalizeTopic(ex.topic, ex.subject)) + '" placeholder="Ex: Calcul litteral"></label>' +
                 '<label>Énoncé<textarea class="rv-statement" data-idx="' + i + '" rows="6">' + App.UI.escapeHtml(ex.statement) + '</textarea></label>' +
                 '<div class="review-card-actions">' +
                     '<button class="rv-save-one secondary" data-idx="' + i + '">💾 Sauvegarder</button>' +
@@ -215,7 +215,7 @@ App.Views.Capture = (function () {
             });
             _c.querySelectorAll('.rv-subject').forEach(function (el) {
                 var i = +el.getAttribute('data-idx');
-                if (_s.exercises[i]) _s.exercises[i].subject = el.value;
+                if (_s.exercises[i]) _s.exercises[i].subject = App.ExerciseStore.normalizeSubject(el.value);
             });
             _c.querySelectorAll('.rv-statement').forEach(function (el) {
                 var i = +el.getAttribute('data-idx');
@@ -223,7 +223,10 @@ App.Views.Capture = (function () {
             });
             _c.querySelectorAll('.rv-topic').forEach(function (el) {
                 var i = +el.getAttribute('data-idx');
-                if (_s.exercises[i]) _s.exercises[i].topic = App.ExerciseStore.normalizeTopic(el.value);
+                if (_s.exercises[i]) {
+                    var subject = _s.exercises[i].subject || 'Autre';
+                    _s.exercises[i].topic = App.ExerciseStore.normalizeTopic(el.value, subject);
+                }
             });
         }
 
@@ -243,7 +246,7 @@ App.Views.Capture = (function () {
                     var ok = window.confirm(
                         'Nouveau classement detecte.\n\n' +
                         'Matiere: ' + exercise.subject + '\n' +
-                        'Sujet: ' + App.ExerciseStore.normalizeTopic(exercise.topic) + '\n\n' +
+                        'Sujet: ' + App.ExerciseStore.normalizeTopic(exercise.topic, exercise.subject) + '\n\n' +
                         'Aucun exercice existant ne correspond a cette combinaison.\n' +
                         'Voulez-vous la creer ?'
                     );
@@ -303,6 +306,20 @@ App.Views.Capture = (function () {
         if (backBtn) {
             backBtn.addEventListener('click', function () { _reset(); _paint(); });
         }
+
+        // Attach voice input buttons to review textareas and inputs
+        if (typeof App.VoiceInput !== 'undefined') {
+            _c.querySelectorAll('.rv-title').forEach(function (el, idx) {
+                var uniqueId = 'rv-title-' + idx;
+                el.id = uniqueId;
+                App.VoiceInput.attachMicButton(uniqueId);
+            });
+            _c.querySelectorAll('.rv-statement').forEach(function (el, idx) {
+                var uniqueId = 'rv-statement-' + idx;
+                el.id = uniqueId;
+                App.VoiceInput.attachMicButton(uniqueId);
+            });
+        }
     }
 
     // ─── Analysis pipeline ────────────────────────────────────────────────────
@@ -343,14 +360,14 @@ App.Views.Capture = (function () {
             return App.ExerciseSplitter.split(ocrText);
         }).then(function (exercises) {
             exercises = exercises.map(function (exercise) {
-                var subject = exercise.subject || App.Settings.get('defaultSubject') || 'Mathematiques';
+                var subject = App.ExerciseStore.normalizeSubject(exercise.subject || App.Settings.get('defaultSubject') || 'Mathematiques');
                 var title = exercise.title || 'Exercice';
                 var statement = App.ExerciseStore.cleanStatementText(exercise.statement || '');
-                var normalizedTopic = App.ExerciseStore.normalizeTopic(exercise.topic);
+                var normalizedTopic = App.ExerciseStore.normalizeTopic(exercise.topic, subject);
                 var topic = App.ExerciseStore.isUnclassifiedTopic(normalizedTopic)
                     ? App.ExerciseStore.inferTopic(subject, title, statement)
                     : normalizedTopic;
-                return Object.assign({}, exercise, { topic: topic });
+                return Object.assign({}, exercise, { subject: subject, topic: topic });
             });
             _s.exercises = exercises;
             _s.phase = 'review';

@@ -2,6 +2,35 @@ var App = window.App || {};
 
 App.ExerciseStore = (function () {
     var DEFAULT_TOPIC = 'A classer';
+    var CANONICAL_SUBJECTS = ['Mathematiques', 'Francais', 'Histoire-Geographie', 'SVT', 'Physique-Chimie', 'Anglais', 'NSI', 'Philosophie', 'Autre'];
+    var SUBJECT_ALIASES = {
+        mathematiques: 'Mathematiques',
+        mathematique: 'Mathematiques',
+        maths: 'Mathematiques',
+        math: 'Mathematiques',
+        francais: 'Francais',
+        francaise: 'Francais',
+        français: 'Francais',
+        histoiregeographie: 'Histoire-Geographie',
+        histoiregeo: 'Histoire-Geographie',
+        hg: 'Histoire-Geographie',
+        histoire: 'Histoire-Geographie',
+        geographie: 'Histoire-Geographie',
+        svt: 'SVT',
+        sciencedelavieetdelaterre: 'SVT',
+        physiquechimie: 'Physique-Chimie',
+        physique: 'Physique-Chimie',
+        chimie: 'Physique-Chimie',
+        pc: 'Physique-Chimie',
+        anglais: 'Anglais',
+        english: 'Anglais',
+        nsi: 'NSI',
+        informatique: 'NSI',
+        numeriqueetsciencesinformatiques: 'NSI',
+        philosophie: 'Philosophie',
+        philo: 'Philosophie',
+        autre: 'Autre'
+    };
     var GENERIC_TOPICS = {
         'general': true,
         'generale': true,
@@ -62,21 +91,70 @@ App.ExerciseStore = (function () {
         ]
     };
 
-    function subjectOptions() {
-        return ['Mathematiques', 'Francais', 'Histoire-Geographie', 'SVT', 'Physique-Chimie', 'Anglais', 'NSI', 'Philosophie', 'Autre'];
+    function _foldText(value) {
+        var out = String(value || '').toLowerCase().trim();
+        try {
+            out = out.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        } catch (e) {}
+        out = out.replace(/[’']/g, ' ');
+        out = out.replace(/[^a-z0-9\-\s]/g, ' ');
+        out = out.replace(/\s+/g, ' ').trim();
+        return out;
     }
 
-    function normalizeTopic(raw) {
+    function _canonicalKey(value) {
+        return _foldText(value).replace(/[\s\-]+/g, '');
+    }
+
+    function _titleCaseAscii(value) {
+        return String(value || '').split(' ').filter(Boolean).map(function (part) {
+            return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+        }).join(' ');
+    }
+
+    function subjectOptions() {
+        return CANONICAL_SUBJECTS.slice();
+    }
+
+    function normalizeSubject(raw) {
+        var value = String(raw || '').trim();
+        if (!value) return 'Autre';
+
+        var key = _canonicalKey(value);
+        if (SUBJECT_ALIASES[key]) return SUBJECT_ALIASES[key];
+        if (SUBJECT_ALIASES[_foldText(value)]) return SUBJECT_ALIASES[_foldText(value)];
+        return 'Autre';
+    }
+
+    function _topicFromRules(subject, foldedTopic) {
+        var subjects = subject ? [subject] : Object.keys(TOPIC_RULES);
+        for (var s = 0; s < subjects.length; s += 1) {
+            var list = TOPIC_RULES[subjects[s]] || [];
+            for (var i = 0; i < list.length; i += 1) {
+                if (_canonicalKey(list[i].topic) === _canonicalKey(foldedTopic)) {
+                    return list[i].topic;
+                }
+            }
+        }
+        return null;
+    }
+
+    function normalizeTopic(raw, subject) {
         var value = String(raw || '').trim();
         if (!value) return DEFAULT_TOPIC;
 
-        var folded = value.toLowerCase();
-        try {
-            folded = folded.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        } catch (e) {}
+        var folded = _foldText(value);
 
         if (GENERIC_TOPICS[folded]) return DEFAULT_TOPIC;
-        return value;
+
+        var normalizedSubject = normalizeSubject(subject);
+        var canonicalFromSubject = _topicFromRules(normalizedSubject, folded);
+        if (canonicalFromSubject) return canonicalFromSubject;
+
+        var canonicalGlobal = _topicFromRules(null, folded);
+        if (canonicalGlobal) return canonicalGlobal;
+
+        return _titleCaseAscii(folded);
     }
 
     function isUnclassifiedTopic(topic) {
@@ -99,7 +177,7 @@ App.ExerciseStore = (function () {
     }
 
     function inferTopic(subject, title, statement) {
-        var normalizedSubject = String(subject || 'Autre');
+        var normalizedSubject = normalizeSubject(subject || 'Autre');
         var text = [title || '', statement || ''].join(' ').trim();
         if (!text) return DEFAULT_TOPIC;
 
@@ -113,8 +191,8 @@ App.ExerciseStore = (function () {
     function buildTaxonomy(exercises) {
         var map = {};
         (exercises || []).forEach(function (exercise) {
-            var subject = String(exercise.subject || 'Autre');
-            var topic = normalizeTopic(exercise.topic);
+            var subject = normalizeSubject(exercise.subject || 'Autre');
+            var topic = normalizeTopic(exercise.topic, subject);
             if (!map[subject]) map[subject] = {};
             map[subject][topic] = true;
         });
@@ -122,11 +200,12 @@ App.ExerciseStore = (function () {
     }
 
     function topicOptionsForSubject(exercises, subject) {
-        var target = String(subject || 'Autre');
+        var target = normalizeSubject(subject || 'Autre');
         var seen = {};
         (exercises || []).forEach(function (exercise) {
-            if (String(exercise.subject || 'Autre') !== target) return;
-            seen[normalizeTopic(exercise.topic)] = true;
+            var exSubject = normalizeSubject(exercise.subject || 'Autre');
+            if (exSubject !== target) return;
+            seen[normalizeTopic(exercise.topic, exSubject)] = true;
         });
         var values = Object.keys(seen).sort();
         if (!values.length) return [DEFAULT_TOPIC];
@@ -135,8 +214,8 @@ App.ExerciseStore = (function () {
 
     function checkPlacement(exercises, subject, topic) {
         var taxonomy = buildTaxonomy(exercises || []);
-        var s = String(subject || 'Autre');
-        var t = normalizeTopic(topic);
+        var s = normalizeSubject(subject || 'Autre');
+        var t = normalizeTopic(topic, s);
         return {
             existsSubject: !!taxonomy[s],
             existsTopicInSubject: !!(taxonomy[s] && taxonomy[s][t])
@@ -145,12 +224,12 @@ App.ExerciseStore = (function () {
 
     function sortBySubjectTopic(exercises) {
         return (exercises || []).slice().sort(function (a, b) {
-            var as = String(a.subject || 'Autre');
-            var bs = String(b.subject || 'Autre');
+            var as = normalizeSubject(a.subject || 'Autre');
+            var bs = normalizeSubject(b.subject || 'Autre');
             if (as !== bs) return as.localeCompare(bs, 'fr');
 
-            var at = normalizeTopic(a.topic);
-            var bt = normalizeTopic(b.topic);
+            var at = normalizeTopic(a.topic, as);
+            var bt = normalizeTopic(b.topic, bs);
             if (at !== bt) return at.localeCompare(bt, 'fr');
 
             var ad = String(a.updatedAt || a.createdAt || '');
@@ -170,12 +249,12 @@ App.ExerciseStore = (function () {
     function fromScan(scan, fields) {
         fields = fields || {};
         var now = new Date().toISOString();
-        var subject = fields.subject || scan.subjectGuess || App.Settings.get('defaultSubject');
+        var subject = normalizeSubject(fields.subject || scan.subjectGuess || App.Settings.get('defaultSubject'));
         var title = fields.title || scan.title || 'Exercice importe';
         var statement = cleanStatementText(fields.statement || scan.ocrText || '');
         var topic = isUnclassifiedTopic(fields.topic)
             ? inferTopic(subject, title, statement)
-            : normalizeTopic(fields.topic || inferTopic(subject, title, statement));
+            : normalizeTopic(fields.topic || inferTopic(subject, title, statement), subject);
         return {
             id: App.DB.nextId('exercise'),
             subject: subject,
@@ -219,6 +298,7 @@ App.ExerciseStore = (function () {
     return {
         defaultTopic: function () { return DEFAULT_TOPIC; },
         subjectOptions: subjectOptions,
+        normalizeSubject: normalizeSubject,
         normalizeTopic: normalizeTopic,
         isUnclassifiedTopic: isUnclassifiedTopic,
         cleanStatementText: cleanStatementText,

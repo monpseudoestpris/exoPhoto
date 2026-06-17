@@ -4,6 +4,20 @@ App.Router = (function () {
     var routes = {};
     var currentRoute = null;
 
+    function parseHash() {
+        var raw = window.location.hash || '#/home';
+        var queryIndex = raw.indexOf('?');
+        var base = queryIndex >= 0 ? raw.slice(0, queryIndex) : raw;
+        var query = queryIndex >= 0 ? raw.slice(queryIndex + 1) : '';
+        var highlight = base === '#/exercise' ? '#/library' : base;
+        return {
+            raw: raw,
+            base: base,
+            query: query,
+            highlight: highlight
+        };
+    }
+
     function register(hash, renderFn) {
         routes[hash] = renderFn;
     }
@@ -13,12 +27,13 @@ App.Router = (function () {
     }
 
     function resolve() {
-        var hash = getHash();
-        return routes[hash] || routes['#/home'];
+        var hash = parseHash();
+        return routes[hash.base] || routes['#/home'];
     }
 
     function render() {
-        currentRoute = getHash();
+        var hash = parseHash();
+        currentRoute = hash.highlight;
         var container = document.getElementById('app');
         var view = resolve();
         if (App.UI && App.UI.highlightNav) App.UI.highlightNav(currentRoute);
