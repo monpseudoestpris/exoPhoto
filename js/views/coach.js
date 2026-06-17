@@ -107,6 +107,7 @@ App.Views.Coach = (function () {
                             '</label>' +
                             '<div class="coach-question-actions">' +
                                 '<button data-coach-action="custom" class="secondary">Envoyer la question</button>' +
+                                '<button data-coach-preset-question="Explique moi l\'enonce, je comprends pas tout" class="ghost">Explique moi l\'enonce, je comprends pas tout</button>' +
                                 '<small class="muted">Raccourci: Ctrl+Entrée</small>' +
                             '</div>' +
                             '<div id="coach-chat" class="coach-chat">' + renderChat(chat) + '</div>' +
@@ -304,6 +305,15 @@ App.Views.Coach = (function () {
         container.querySelectorAll('[data-coach-action]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 runAction(btn.getAttribute('data-coach-action'));
+            });
+        });
+
+        container.querySelectorAll('[data-coach-preset-question]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var preset = btn.getAttribute('data-coach-preset-question') || '';
+                var q = container.querySelector('#coach-question');
+                if (q) q.value = preset;
+                runAction('custom');
             });
         });
 

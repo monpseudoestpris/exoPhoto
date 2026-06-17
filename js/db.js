@@ -2,7 +2,7 @@ var App = window.App || {};
 
 App.DB = (function () {
     var DB_NAME = 'ExoPhotoDB';
-    var DB_VERSION = 1;
+    var DB_VERSION = 2;
     var db = null;
 
     function withStore(storeName, mode, action) {
@@ -34,9 +34,15 @@ App.DB = (function () {
                 if (!database.objectStoreNames.contains('exercises')) {
                     var exercises = database.createObjectStore('exercises', { keyPath: 'id' });
                     exercises.createIndex('subject', 'subject', { unique: false });
+                    exercises.createIndex('topic', 'topic', { unique: false });
                     exercises.createIndex('updatedAt', 'updatedAt', { unique: false });
                     exercises.createIndex('gradeLevel', 'gradeLevel', { unique: false });
                     exercises.createIndex('status', 'status', { unique: false });
+                } else {
+                    var existing = request.transaction.objectStore('exercises');
+                    if (!existing.indexNames.contains('topic')) {
+                        existing.createIndex('topic', 'topic', { unique: false });
+                    }
                 }
             };
 

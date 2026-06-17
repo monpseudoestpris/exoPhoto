@@ -176,12 +176,32 @@ App.Views.Home = (function () {
             convertBtn.addEventListener('click', function () {
                 var subject = window.prompt('Matiere', activeScan.subjectGuess || App.Settings.get('defaultSubject'));
                 if (!subject) return;
+                var topic = window.prompt('Sujet (ex: Calcul litteral)', App.ExerciseStore.defaultTopic());
+                if (topic == null) return;
                 var title = window.prompt('Titre de l\'exercice', activeScan.title || 'Exercice OCR');
                 if (!title) return;
-                var exercise = App.ExerciseStore.fromScan(activeScan, { subject: subject, title: title });
-                App.DB.saveExercise(exercise).then(function () {
-                    App.UI.showToast('Exercice ajoute a la bibliotheque', 'success');
-                    App.Router.navigate('#/library');
+                var exercise = App.ExerciseStore.fromScan(activeScan, {
+                    subject: subject,
+                    topic: topic,
+                    title: title
+                });
+
+                App.DB.getExercises().then(function (existing) {
+                    var check = App.ExerciseStore.checkPlacement(existing, exercise.subject, exercise.topic);
+                    if (!check.existsTopicInSubject) {
+                        var ok = window.confirm(
+                            'Nouveau classement detecte.\n\n' +
+                            'Matiere: ' + exercise.subject + '\n' +
+                            'Sujet: ' + App.ExerciseStore.normalizeTopic(exercise.topic) + '\n\n' +
+                            'Aucun exercice existant ne correspond a cette combinaison.\n' +
+                            'Voulez-vous la creer ?'
+                        );
+                        if (!ok) return;
+                    }
+                    return App.DB.saveExercise(exercise).then(function () {
+                        App.UI.showToast('Exercice ajoute a la bibliotheque', 'success');
+                        App.Router.navigate('#/library');
+                    });
                 });
             });
         }

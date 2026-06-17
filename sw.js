@@ -1,5 +1,5 @@
-var APP_VERSION = 'v15';
-var CACHE_NAME = 'exophoto-v15';
+var APP_VERSION = 'v20';
+var CACHE_NAME = 'exophoto-v20';
 
 var ASSETS = [
   './',

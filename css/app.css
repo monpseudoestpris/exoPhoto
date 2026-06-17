@@ -690,6 +690,7 @@ body[data-nav-collapsed="true"] .nav-action {
 .coach-question-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.7rem;
     margin-top: -0.15rem;
 }

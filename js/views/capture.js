@@ -9,7 +9,7 @@ App.Views.Capture = (function () {
         imageDataUrl: null,
         fileName: '',
         scan: null,
-        exercises: [],       // [{title, statement, subject}]
+        exercises: [],       // [{title, statement, subject, topic}]
         step: ''             // human-readable progress label
     };
     var _c = null;
@@ -106,8 +106,8 @@ App.Views.Capture = (function () {
                         }).join('') +
                     '</select></label>' +
                 '</div>' +
+                '<label>Sujet<input class="rv-topic" data-idx="' + i + '" value="' + App.UI.escapeHtml(App.ExerciseStore.normalizeTopic(ex.topic)) + '" placeholder="Ex: Calcul litteral"></label>' +
                 '<label>Énoncé<textarea class="rv-statement" data-idx="' + i + '" rows="6">' + App.UI.escapeHtml(ex.statement) + '</textarea></label>' +
-                '<div class="latex-preview math-content" data-idx="' + i + '">' + App.UI.escapeHtml(ex.statement) + '</div>' +
                 '<div class="review-card-actions">' +
                     '<button class="rv-save-one secondary" data-idx="' + i + '">💾 Sauvegarder</button>' +
                     '<button class="rv-remove-one ghost" data-idx="' + i + '">Retirer</button>' +
@@ -221,17 +221,11 @@ App.Views.Capture = (function () {
                 var i = +el.getAttribute('data-idx');
                 if (_s.exercises[i]) _s.exercises[i].statement = el.value;
             });
-        }
-
-        _c.querySelectorAll('.rv-statement').forEach(function (el) {
-            el.addEventListener('input', function () {
+            _c.querySelectorAll('.rv-topic').forEach(function (el) {
                 var i = +el.getAttribute('data-idx');
-                var preview = _c.querySelector('.latex-preview[data-idx="' + i + '"]');
-                if (!preview) return;
-                preview.textContent = el.value;
-                App.UI.renderMath(preview);
+                if (_s.exercises[i]) _s.exercises[i].topic = App.ExerciseStore.normalizeTopic(el.value);
             });
-        });
+        }
 
         function save(idx) {
             var ex = _s.exercises[idx];
@@ -239,9 +233,24 @@ App.Views.Capture = (function () {
             var exercise = App.ExerciseStore.fromScan(_s.scan || { id: null, ocrText: '' }, {
                 title: ex.title,
                 subject: ex.subject,
+                topic: ex.topic,
                 statement: ex.statement
             });
-            return App.DB.saveExercise(exercise);
+
+            return App.DB.getExercises().then(function (existing) {
+                var check = App.ExerciseStore.checkPlacement(existing, exercise.subject, exercise.topic);
+                if (!check.existsTopicInSubject) {
+                    var ok = window.confirm(
+                        'Nouveau classement detecte.\n\n' +
+                        'Matiere: ' + exercise.subject + '\n' +
+                        'Sujet: ' + App.ExerciseStore.normalizeTopic(exercise.topic) + '\n\n' +
+                        'Aucun exercice existant ne correspond a cette combinaison.\n' +
+                        'Voulez-vous la creer ?'
+                    );
+                    if (!ok) throw new Error('Sauvegarde annulee');
+                }
+                return App.DB.saveExercise(exercise);
+            });
         }
 
         var saveAllBtn = document.getElementById('rv-save-all');
@@ -333,6 +342,16 @@ App.Views.Capture = (function () {
             _setStep('Détection des exercices…');
             return App.ExerciseSplitter.split(ocrText);
         }).then(function (exercises) {
+            exercises = exercises.map(function (exercise) {
+                var subject = exercise.subject || App.Settings.get('defaultSubject') || 'Mathematiques';
+                var title = exercise.title || 'Exercice';
+                var statement = App.ExerciseStore.cleanStatementText(exercise.statement || '');
+                var normalizedTopic = App.ExerciseStore.normalizeTopic(exercise.topic);
+                var topic = App.ExerciseStore.isUnclassifiedTopic(normalizedTopic)
+                    ? App.ExerciseStore.inferTopic(subject, title, statement)
+                    : normalizedTopic;
+                return Object.assign({}, exercise, { topic: topic });
+            });
             _s.exercises = exercises;
             _s.phase = 'review';
             _paint();
