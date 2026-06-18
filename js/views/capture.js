@@ -7,8 +7,12 @@ App.Views.Capture = (function () {
     var _s = {
         phase: 'idle',       // 'idle' | 'processing' | 'review'
         imageDataUrl: null,
+        imageDataUrls: [],
+        pageFileNames: [],   // parallel array of original file names
         fileName: '',
         scan: null,
+        scanMode: 'multiple',
+        setupModalOpen: false,
         exercises: [],       // [{title, statement, subject, topic}]
         step: ''             // human-readable progress label
     };
@@ -32,6 +36,7 @@ App.Views.Capture = (function () {
         var settings = App.Settings.load();
         var keyReady = App.ProviderKeys.isUnlocked('mistral');
         var keyStored = App.ProviderKeys.hasKey('mistral');
+        var hasSelection = !!_s.imageDataUrls.length;
 
         var keyBanner = '';
         if (!keyStored) {
@@ -44,33 +49,63 @@ App.Views.Capture = (function () {
             '<div class="page-stack">' +
                 '<section class="hero">' +
                     '<h1>Capture et OCR</h1>' +
-                    '<p>Prends une photo ou importe une image, puis lance l\'analyse. Le texte est extrait et les exos sont separés automatiquement.</p>' +
+                    '<p>Prends une photo ou importe un document, puis choisis le mode d\'analyse.</p>' +
                     keyBanner +
-                    '<div class="hero-actions cta-row">' +
+                    '<div class="hero-actions cta-row capture-entry-actions">' +
                         '<button id="scan-camera-btn" class="cta-prominent">Prendre une photo</button>' +
-                        '<button id="scan-upload-btn" class="secondary">Importer une image</button>' +
+                        '<button id="scan-upload-btn" class="cta-prominent secondary">Importer une image</button>' +
                     '</div>' +
-                    '<input id="scan-camera-input" type="file" accept="image/*" capture="environment" hidden>' +
-                    '<input id="scan-upload-input" type="file" accept="image/*" hidden>' +
+                    '<input id="scan-camera-input" type="file" accept="image/*" capture="environment" multiple hidden>' +
+                    '<input id="scan-upload-input" type="file" accept="image/*" multiple hidden>' +
                 '</section>' +
-                '<section class="two-col">' +
-                    '<div class="upload-card">' +
-                        '<h2>Analyse rapide</h2>' +
-                        '<div class="field-grid">' +
-                            '<label>Image selectionnee<input id="scan-file-name" type="text" readonly placeholder="Aucune image selectionnee"></label>' +
-                            '<label>Matière pressentie<input id="scan-subject-input" type="text" value="' + App.UI.escapeHtml(settings.defaultSubject || '') + '" placeholder="Mathematiques, Francais..."></label>' +
-                            '<label>Titre (optionnel)<input id="scan-title-input" type="text" placeholder="Ex : Equations feuille 4"></label>' +
+                (hasSelection ?
+                    '<section class="panel capture-selected-panel">' +
+                        '<div class="capture-selected-head">' +
+                            '<div>' +
+                                '<h2>Document selectionne</h2>' +
+                                '<p class="muted">' + App.UI.escapeHtml(_s.fileName || 'Document') + '</p>' +
+                            '</div>' +
                             '<div class="inline-actions">' +
-                                '<button id="launch-ocr-btn" class="cta-prominent" disabled>Analyser (OCR + detection)</button>' +
-                                '<button id="clear-image-btn" class="ghost" disabled>Effacer</button>' +
+                                '<button id="reopen-setup-btn" class="secondary">Configurer l\'analyse</button>' +
+                                '<button id="clear-image-btn" class="ghost">Effacer</button>' +
                             '</div>' +
                         '</div>' +
-                    '</div>' +
-                    '<div class="panel"><h2>Aperçu</h2><div id="preview-slot" class="empty-state">Aucune image sélectionnée.</div></div>' +
-                '</section>' +
+                        '<div id="preview-slot" class="capture-preview-slot"></div>' +
+                    '</section>'
+                    : '') +
+                '<div id="capture-setup-modal" class="coach-modal-backdrop' + (_s.setupModalOpen ? ' active' : '') + '" aria-hidden="' + (_s.setupModalOpen ? 'false' : 'true') + '">' +
+                    '<article class="coach-modal capture-setup-modal" role="dialog" aria-modal="true" aria-labelledby="capture-setup-title">' +
+                        '<header class="coach-modal-head">' +
+                            '<h3 id="capture-setup-title">Configurer l\'analyse</h3>' +
+                            '<button id="capture-setup-close-x" class="ghost" aria-label="Fermer">Fermer</button>' +
+                        '</header>' +
+                        '<div class="coach-modal-content">' +
+                            '<div class="capture-setup-summary">' +
+                                '<strong>' + App.UI.escapeHtml(_s.fileName || 'Document') + '</strong>' +
+                                '<span class="muted">' + (_s.imageDataUrls.length ? (_s.imageDataUrls.length + ' page' + (_s.imageDataUrls.length > 1 ? 's' : '')) : 'Aucune page') + '</span>' +
+                            '</div>' +
+                            (_s.imageDataUrls.length > 1 ?
+                                '<div id="page-order-container"></div>'
+                            : '') +
+                            '<label>Matière pressentie<input id="scan-subject-input" type="text" value="' + App.UI.escapeHtml(settings.defaultSubject || '') + '" placeholder="Mathematiques, Francais..."></label>' +
+                            '<label>Titre (optionnel)<input id="scan-title-input" type="text" placeholder="Ex : Equations feuille 4" value="' + App.UI.escapeHtml(_s.fileName || '') + '"></label>' +
+                            '<fieldset class="scan-mode-fieldset">' +
+                                '<legend>Le document contient</legend>' +
+                                '<label class="scan-mode-option"><input type="radio" name="scan-mode" value="multiple"' + (_s.scanMode === 'multiple' ? ' checked' : '') + '> Plusieurs exercices a separer</label>' +
+                                '<label class="scan-mode-option"><input type="radio" name="scan-mode" value="single"' + (_s.scanMode === 'single' ? ' checked' : '') + '> Un seul grand exercice / devoir</label>' +
+                            '</fieldset>' +
+                        '</div>' +
+                        '<footer class="coach-modal-actions">' +
+                            '<button id="capture-setup-clear" class="ghost"' + (hasSelection ? '' : ' disabled') + '>Effacer</button>' +
+                            '<button id="capture-setup-close" class="secondary">Annuler</button>' +
+                            '<button id="launch-ocr-btn"' + (hasSelection ? '' : ' disabled') + '>Analyser</button>' +
+                        '</footer>' +
+                    '</article>' +
+                '</div>' +
             '</div>';
 
         _bindIdle();
+        if (hasSelection) _renderIdlePreview();
     }
 
     function _paintProcessing() {
@@ -81,7 +116,9 @@ App.Views.Capture = (function () {
                     '<p id="capture-step-label" class="step-label">' + App.UI.escapeHtml(_s.step || 'Initialisation…') + '</p>' +
                     '<div class="progress-dots"><span></span><span></span><span></span></div>' +
                 '</section>' +
-                (_s.imageDataUrl ? '<section><div class="panel"><img class="image-preview" src="' + _s.imageDataUrl + '" alt="Image analysée"></div></section>' : '') +
+                (_s.imageDataUrl ? '<section><div class="panel"><img class="image-preview" src="' + _s.imageDataUrl + '" alt="Image analysée">' +
+                (_s.imageDataUrls.length > 1 ? '<p class="muted" style="margin:.5rem 0 0;font-size:.88rem">' + _s.imageDataUrls.length + ' pages en cours d\'analyse</p>' : '') +
+                '</div></section>' : '') +
             '</div>';
     }
 
@@ -107,8 +144,12 @@ App.Views.Capture = (function () {
                     '</select></label>' +
                 '</div>' +
                 '<label>Sujet<input class="rv-topic" data-idx="' + i + '" value="' + App.UI.escapeHtml(App.ExerciseStore.normalizeTopic(ex.topic, ex.subject)) + '" placeholder="Ex: Calcul litteral"></label>' +
-                '<label>Énoncé<textarea class="rv-statement" data-idx="' + i + '" rows="6">' + App.UI.escapeHtml(ex.statement) + '</textarea></label>' +
+                '<label>Énoncé' +
+                    '<div class="rv-statement-preview math-content" id="rv-preview-' + i + '">' + App.UI.statementHtml(ex.statement, _s.scan) + '</div>' +
+                    '<textarea class="rv-statement" data-idx="' + i + '" rows="5">' + App.UI.escapeHtml(ex.statement) + '</textarea>' +
+                '</label>' +
                 '<div class="review-card-actions">' +
+                    App.UI.sourceDocumentButton(_s.scan, 'Document fourni') +
                     '<button class="rv-save-one secondary" data-idx="' + i + '">💾 Sauvegarder</button>' +
                     '<button class="rv-remove-one ghost" data-idx="' + i + '">Retirer</button>' +
                 '</div>' +
@@ -127,6 +168,7 @@ App.Views.Capture = (function () {
                 '</section>' +
                 (_s.imageDataUrl ?
                     '<section><div class="panel"><img class="image-preview" src="' + _s.imageDataUrl + '" alt="Image source">' +
+                    (_s.imageDataUrls.length > 1 ? '<p class="muted" style="margin:.5rem 0 0;font-size:.88rem">Document source · ' + _s.imageDataUrls.length + ' pages</p>' : '') +
                     '<p class="muted" style="margin:.5rem 0 0;font-size:.88rem">Source OCR · ' + (_s.scan ? App.UI.formatDate(_s.scan.createdAt) : '') + '</p>' +
                     '</div></section>'
                     : '') +
@@ -134,6 +176,7 @@ App.Views.Capture = (function () {
             '</div>';
 
         _bindReview();
+        App.UI.bindDocumentViewer(_c);
         App.UI.renderMath(_c);
     }
 
@@ -144,25 +187,67 @@ App.Views.Capture = (function () {
         var uploadInput = document.getElementById('scan-upload-input');
         var cameraBtn = document.getElementById('scan-camera-btn');
         var uploadBtn = document.getElementById('scan-upload-btn');
-        var fileNameInput = document.getElementById('scan-file-name');
         var launchBtn = document.getElementById('launch-ocr-btn');
         var clearBtn = document.getElementById('clear-image-btn');
+        var clearSetupBtn = document.getElementById('capture-setup-clear');
+        var reopenSetupBtn = document.getElementById('reopen-setup-btn');
+        var modal = document.getElementById('capture-setup-modal');
+        var closeModalBtn = document.getElementById('capture-setup-close');
+        var closeModalXBtn = document.getElementById('capture-setup-close-x');
 
-        function onFileChosen(file) {
-            if (!file) return;
-            _s.fileName = file.name;
-            if (fileNameInput) fileNameInput.value = _s.fileName;
-            App.ImageUtils.readFileAsDataUrl(file).then(function (dataUrl) {
-                return App.ImageUtils.resizeDataUrl(dataUrl, {
-                    maxWidth: App.Settings.get('imageMaxWidth'),
-                    quality: App.Settings.get('imageQuality')
+        function openSetupModal() {
+            if (!_s.imageDataUrls.length || !modal) return;
+            _s.setupModalOpen = true;
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeSetupModal() {
+            if (!modal) return;
+            _s.setupModalOpen = false;
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function clearSelection() {
+            _s.imageDataUrl = null;
+            _s.imageDataUrls = [];
+            _s.pageFileNames = [];
+            _s.fileName = '';
+            _s.setupModalOpen = false;
+            cameraInput.value = '';
+            uploadInput.value = '';
+            _paint();
+        }
+
+        _c.querySelectorAll('input[name="scan-mode"]').forEach(function (input) {
+            input.addEventListener('change', function () {
+                if (input.checked) _s.scanMode = input.value;
+            });
+        });
+
+        function onFilesChosen(fileList) {
+            var files = Array.prototype.slice.call(fileList || []).filter(Boolean);
+            if (!files.length) return;
+            _s.fileName = files.length === 1 ? files[0].name : (files.length + ' pages');
+            Promise.all(files.map(function (file) {
+                return App.ImageUtils.readFileAsDataUrl(file).then(function (dataUrl) {
+                    return App.ImageUtils.resizeDataUrl(dataUrl, {
+                        maxWidth: App.Settings.get('imageMaxWidth'),
+                        quality: App.Settings.get('imageQuality')
+                    });
+                }).then(function (result) {
+                    return {
+                        fileName: file.name,
+                        dataUrl: result.dataUrl
+                    };
                 });
-            }).then(function (result) {
-                _s.imageDataUrl = result.dataUrl;
-                document.getElementById('preview-slot').innerHTML =
-                    '<img class="image-preview" src="' + _s.imageDataUrl + '" alt="Aperçu">';
-                launchBtn.disabled = false;
-                clearBtn.disabled = false;
+            })).then(function (pages) {
+                _s.imageDataUrls = pages.map(function (page) { return page.dataUrl; });
+                _s.pageFileNames = pages.map(function (page) { return page.fileName; });
+                _s.imageDataUrl = _s.imageDataUrls[0] || null;
+                _s.setupModalOpen = true;
+                _paint();
             }).catch(function (err) {
                 App.UI.showToast(err.message || 'Image invalide', 'error');
             });
@@ -177,34 +262,83 @@ App.Views.Capture = (function () {
         });
 
         cameraInput.addEventListener('change', function () {
-            onFileChosen(cameraInput.files && cameraInput.files[0]);
+            onFilesChosen(cameraInput.files);
         });
 
         uploadInput.addEventListener('change', function () {
-            onFileChosen(uploadInput.files && uploadInput.files[0]);
+            onFilesChosen(uploadInput.files);
         });
 
-        clearBtn.addEventListener('click', function () {
-            _s.imageDataUrl = null;
-            _s.fileName = '';
-            if (fileNameInput) fileNameInput.value = '';
-            cameraInput.value = '';
-            uploadInput.value = '';
-            document.getElementById('preview-slot').innerHTML = 'Aucune image sélectionnée.';
-            launchBtn.disabled = true;
-            clearBtn.disabled = true;
-        });
+        if (clearBtn) clearBtn.addEventListener('click', clearSelection);
+        if (clearSetupBtn) clearSetupBtn.addEventListener('click', clearSelection);
+        if (reopenSetupBtn) reopenSetupBtn.addEventListener('click', openSetupModal);
+        if (closeModalBtn) closeModalBtn.addEventListener('click', closeSetupModal);
+        if (closeModalXBtn) closeModalXBtn.addEventListener('click', closeSetupModal);
+        if (modal) {
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) closeSetupModal();
+                var upBtn = event.target.closest('.page-order-up');
+                var downBtn = event.target.closest('.page-order-down');
+                if (upBtn && !upBtn.disabled) {
+                    _movePage(+upBtn.getAttribute('data-page-idx'), +upBtn.getAttribute('data-page-idx') - 1);
+                } else if (downBtn && !downBtn.disabled) {
+                    _movePage(+downBtn.getAttribute('data-page-idx'), +downBtn.getAttribute('data-page-idx') + 1);
+                }
+            });
+        }
 
         launchBtn.addEventListener('click', function () {
-            if (!_s.imageDataUrl) return;
+            if (!_s.imageDataUrls.length) return;
             if (!App.ProviderKeys.isUnlocked('mistral')) {
                 App.UI.showToast('Déverrouillez d\'abord la clé Mistral dans Paramètres', 'warning');
                 return;
             }
             var title = document.getElementById('scan-title-input').value.trim() || _s.fileName || 'Nouveau scan';
             var subject = document.getElementById('scan-subject-input').value.trim();
-            _launchAnalysis(title, subject);
+            _s.setupModalOpen = false;
+            _launchAnalysis(title, subject, _s.scanMode || 'multiple');
         });
+    }
+
+    function _renderPageOrderList() {
+        var slot = document.getElementById('page-order-container') || document.getElementById('preview-slot');
+        if (!slot) return;
+        if (!_s.imageDataUrls.length) { slot.innerHTML = ''; return; }
+
+        var items = _s.imageDataUrls.map(function (dataUrl, i) {
+            var name = App.UI.escapeHtml(_s.pageFileNames[i] || ('Page ' + (i + 1)));
+            var isFirst = i === 0;
+            var isLast = i === _s.imageDataUrls.length - 1;
+            return '<div class="page-order-item" data-page-idx="' + i + '">' +
+                '<div class="page-order-thumb">' +
+                    '<img src="' + dataUrl + '" alt="Page ' + (i + 1) + '">' +
+                '</div>' +
+                '<div class="page-order-info">' +
+                    '<strong>Page ' + (i + 1) + '</strong>' +
+                    '<span class="muted">' + name + '</span>' +
+                '</div>' +
+                '<div class="page-order-btns">' +
+                    '<button type="button" class="ghost page-order-up" data-page-idx="' + i + '"' + (isFirst ? ' disabled' : '') + ' aria-label="Remonter">↑</button>' +
+                    '<button type="button" class="ghost page-order-down" data-page-idx="' + i + '"' + (isLast ? ' disabled' : '') + ' aria-label="Descendre">↓</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+
+        slot.innerHTML = '<div class="page-order-list">' + items + '</div>';
+    }
+
+    function _renderIdlePreview() {
+        _renderPageOrderList();
+    }
+
+    function _movePage(from, to) {
+        if (to < 0 || to >= _s.imageDataUrls.length) return;
+        var tmpUrl = _s.imageDataUrls.splice(from, 1)[0];
+        _s.imageDataUrls.splice(to, 0, tmpUrl);
+        var tmpName = _s.pageFileNames.splice(from, 1)[0];
+        _s.pageFileNames.splice(to, 0, tmpName);
+        _s.imageDataUrl = _s.imageDataUrls[0] || null;
+        _renderPageOrderList();
     }
 
     function _bindReview() {
@@ -324,7 +458,18 @@ App.Views.Capture = (function () {
 
     // ─── Analysis pipeline ────────────────────────────────────────────────────
 
-    function _launchAnalysis(title, subject) {
+    function _buildExercisesFromOcr(title, subject, ocrText, scanMode) {
+        if (scanMode === 'single') {
+            return Promise.resolve([{
+                title: title || 'Exercice',
+                statement: ocrText || '',
+                subject: subject || App.Settings.get('defaultSubject') || 'Mathematiques'
+            }]);
+        }
+        return App.ExerciseSplitter.split(ocrText);
+    }
+
+    function _launchAnalysis(title, subject, scanMode) {
         _s.phase = 'processing';
         _s.step = 'Création du scan…';
         _paint();
@@ -334,12 +479,25 @@ App.Views.Capture = (function () {
             sourceType: 'upload',
             subjectGuess: subject,
             imageDataUrl: _s.imageDataUrl,
-            metadata: { originalFileName: _s.fileName }
+            metadata: {
+                originalFileName: _s.fileName,
+                scanMode: scanMode || 'multiple',
+                sourceImages: _s.imageDataUrls.map(function (dataUrl, index) {
+                    return {
+                        pageNumber: index + 1,
+                        fileName: (_s.imageDataUrls.length > 1 ? 'Page ' + (index + 1) : _s.fileName),
+                        dataUrl: dataUrl
+                    };
+                })
+            }
         }).then(function (scan) {
             _s.scan = scan;
             _setStep('OCR Mistral en cours…');
-            return App.MistralOCR.processImageDataUrl(_s.imageDataUrl, {
-                tableFormat: App.Settings.get('ocrTableFormat')
+            return App.MistralOCR.processImageDataUrls(_s.imageDataUrls, {
+                tableFormat: App.Settings.get('ocrTableFormat'),
+                onProgress: function (pageIndex, total) {
+                    _setStep('OCR Mistral en cours… page ' + (pageIndex + 1) + ' / ' + total);
+                }
             });
         }).then(function (ocrResult) {
             _setStep('Mise à jour du scan…');
@@ -349,15 +507,21 @@ App.Views.Capture = (function () {
                 ocrRaw: ocrResult.raw,
                 metadata: Object.assign({}, _s.scan.metadata, {
                     pageCount: ocrResult.pageCount,
-                    usage: ocrResult.usage
+                    sourcePageCount: _s.imageDataUrls.length,
+                    usage: ocrResult.usage,
+                    scanMode: scanMode || 'multiple',
+                    extractedImages: Array.isArray(ocrResult.images) ? ocrResult.images : [],
+                    extractedImageCount: (ocrResult.images || []).filter(function (image) {
+                        return !!image.dataUrl;
+                    }).length
                 })
             }).then(function (updatedScan) {
                 _s.scan = updatedScan;
                 return ocrResult.text;
             });
         }).then(function (ocrText) {
-            _setStep('Détection des exercices…');
-            return App.ExerciseSplitter.split(ocrText);
+            _setStep(scanMode === 'single' ? 'Préparation de l\'énoncé…' : 'Détection des exercices…');
+            return _buildExercisesFromOcr(title, subject, ocrText, scanMode || 'multiple');
         }).then(function (exercises) {
             exercises = exercises.map(function (exercise) {
                 var subject = App.ExerciseStore.normalizeSubject(exercise.subject || App.Settings.get('defaultSubject') || 'Mathematiques');
@@ -367,7 +531,11 @@ App.Views.Capture = (function () {
                 var topic = App.ExerciseStore.isUnclassifiedTopic(normalizedTopic)
                     ? App.ExerciseStore.inferTopic(subject, title, statement)
                     : normalizedTopic;
-                return Object.assign({}, exercise, { subject: subject, topic: topic });
+                return Object.assign({}, exercise, {
+                    subject: subject,
+                    topic: topic,
+                    sourceScanId: _s.scan ? _s.scan.id : null
+                });
             });
             _s.exercises = exercises;
             _s.phase = 'review';
@@ -388,9 +556,12 @@ App.Views.Capture = (function () {
     function _reset() {
         _s.phase = 'idle';
         _s.imageDataUrl = null;
+        _s.imageDataUrls = [];
+        _s.pageFileNames = [];
         _s.fileName = '';
         _s.scan = null;
         _s.exercises = [];
+        _s.setupModalOpen = false;
         _s.step = '';
     }
 

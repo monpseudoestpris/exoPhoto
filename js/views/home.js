@@ -135,6 +135,7 @@ App.Views.Home = (function () {
             '<div class="status-row">' +
                 App.UI.badge(scan.ocrStatus, scan.ocrStatus === 'error' ? 'error' : (scan.ocrStatus === 'pending' ? 'pending' : '')) +
                 App.UI.badge(scan.subjectGuess || 'Matiere a confirmer') +
+                ((scan.metadata && scan.metadata.sourcePageCount > 1) ? App.UI.badge(scan.metadata.sourcePageCount + ' pages') : '') +
             '</div>' +
             '<h2>' + App.UI.escapeHtml(scan.title || 'Scan') + '</h2>' +
             '<div class="scan-meta">' +

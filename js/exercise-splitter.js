@@ -18,6 +18,7 @@ App.ExerciseSplitter = (function () {
         '- Un exercice est une unité cohérente avec un énoncé/question identifiable.',
         '- S\'il n\'y a qu\'un seul exercice, retourne un tableau à un élément.',
         '- Préserve le texte des énoncés tel quel (markdown, formules, etc.), sans le reformuler.',
+        '- IMPORTANT : conserve intégralement les balises d\'images OCR de la forme ![nom](nom) dans le champ "statement". Ne les supprime jamais, ne les reformule pas.',
         '- Pour "subject", choisis parmi : Mathematiques, Francais, Histoire-Geographie, SVT, Physique-Chimie, Anglais, NSI, Philosophie, Autre.',
         '- Ajoute aussi "topic" (sujet precis) quand c\'est identifiable: ex. Calcul litteral, Equations, Geometrie, Grammaire, Electricite...',
         '',

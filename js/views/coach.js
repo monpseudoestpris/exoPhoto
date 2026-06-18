@@ -136,100 +136,102 @@ App.Views.Coach = (function () {
             var attempt = _loadAttempt(active.id);
             var chat = _loadChat(active.id);
             var mobileListOpen = _isMobile() && _isMobileListOpen();
-
-            container.innerHTML =
-                '<div class="page-stack">' +
-                    '<section class="hero">' +
-                        '<h1>Prof IA</h1>' +
-                        '<p>Travaille ta resolution ici. L\'agent explique l\'enonce, donne des indices progressifs et corrige ta tentative.</p>' +
-                        '<div class="hero-actions">' +
-                            '<button id="coach-essential-btn" class="secondary">L\'essentiel</button>' +
-                            (isVariant ? '<button id="coach-save-variant" class="secondary">Sauver la variante</button>' : '') +
-                            '<a class="button-link secondary" href="#/exercise?id=' + encodeURIComponent(active.id) + '">Retour a l\'exo</a>' +
-                            '<a class="button-link" href="#/library">Retour a la liste</a>' +
-                        '</div>' +
-                    '</section>' +
-                    '<section class="coach-grid ' + (mobileListOpen ? 'show-mobile-list' : 'hide-mobile-list') + '">' +
-                        '<aside class="list-card coach-list">' +
-                            '<div class="coach-list-head">' +
-                                '<h2>Exercices</h2>' +
-                                '<button id="coach-close-list" class="ghost mobile-only">Continuer</button>' +
+            return (active.promptSourceScanId ? App.DB.getScan(active.promptSourceScanId) : Promise.resolve(null)).then(function (sourceScan) {
+                container.innerHTML =
+                    '<div class="page-stack">' +
+                        '<section class="hero">' +
+                            '<h1>Prof IA</h1>' +
+                            '<p>Travaille ta resolution ici. L\'agent explique l\'enonce, donne des indices progressifs et corrige ta tentative.</p>' +
+                            '<div class="hero-actions">' +
+                                '<button id="coach-essential-btn" class="secondary">L\'essentiel</button>' +
+                                (isVariant ? '<button id="coach-save-variant" class="secondary">Sauver la variante</button>' : '') +
+                                '<a class="button-link secondary" href="#/exercise?id=' + encodeURIComponent(active.id) + '">Retour a l\'exo</a>' +
+                                '<a class="button-link" href="#/library">Retour a la liste</a>' +
                             '</div>' +
-                            '<div class="exercise-list">' + exercises.map(function (ex) {
-                                return '<div class="exercise-item ' + (ex.id === active.id ? 'active' : '') + '" data-coach-ex="' + ex.id + '">' +
-                                    '<h3>' + App.UI.escapeHtml(ex.title || 'Exercice') + '</h3>' +
-                                    '<div class="exercise-meta"><div>' + App.UI.escapeHtml(ex.subject || 'Autre') + ' · ' + App.UI.escapeHtml(ex.topic || App.ExerciseStore.defaultTopic()) + '</div><div>' + App.UI.formatDate(ex.updatedAt || ex.createdAt) + '</div></div>' +
-                                '</div>';
-                            }).join('') + '</div>' +
-                        '</aside>' +
-                        '<section class="editor-card coach-workspace">' +
-                            '<button id="coach-open-list" class="ghost mobile-only">Changer d\'exercice</button>' +
-                            '<h2>' + App.UI.escapeHtml(active.title || 'Exercice') + '</h2>' +
-                            '<div class="chip-row">' +
-                                App.UI.badge(active.subject || 'Autre') +
-                                App.UI.badge(active.gradeLevel || 'Niveau libre') +
-                                App.UI.badge(active.difficulty || 'Moyen') +
-                            '</div>' +
-                            '<h3>Enonce</h3>' +
-                            '<div class="ocr-output math-content" id="coach-statement">' + App.UI.escapeHtml(active.statement || '') + '</div>' +
-                            '<label>Ma tentative' +
-                                '<textarea id="coach-attempt" rows="7" placeholder="Ecris ici ton raisonnement, calculs, et ou tu bloques...">' + App.UI.escapeHtml(attempt) + '</textarea>' +
-                            '</label>' +
-                            '<div class="coach-actions">' +
-                                '<button data-coach-action="explain" class="secondary">Expliquer l\'enonce</button>' +
-                                '<button data-coach-action="hint" class="secondary">Donner un indice</button>' +
-                                '<button data-coach-action="method" class="secondary">Donner la methode</button>' +
-                                '<button data-coach-action="review">Corriger ma tentative</button>' +
-                            '</div>' +
-                            (isVariant ? '<div class="coach-question-actions"><button id="coach-save-variant-inline" class="secondary">Sauver la variante</button></div>' : '') +
-                            '<label>Question libre (optionnel)' +
-                                '<textarea id="coach-question" rows="3" placeholder="Ex: pourquoi je dois factoriser avant de developper ?"></textarea>' +
-                            '</label>' +
-                            '<div class="coach-question-actions">' +
-                                '<button data-coach-action="custom" class="secondary">Envoyer la question</button>' +
-                                '<button data-coach-preset-question="Explique moi l\'enonce, je comprends pas tout" class="ghost">Explique moi l\'enonce, je comprends pas tout</button>' +
-                                '<small class="muted">Raccourci: Ctrl+Entrée</small>' +
-                            '</div>' +
-                            '<section class="mini-course-corner">' +
-                                '<div class="coach-list-head">' +
-                                    '<h3>Coin petits cours</h3>' +
-                                    '<small class="muted">' + miniCourses.length + ' sauvegarde(s)</small>' +
-                                '</div>' +
-                                renderMiniCourses(miniCourses) +
-                            '</section>' +
-                            '<div id="coach-chat" class="coach-chat">' + renderChat(chat) + '</div>' +
                         '</section>' +
-                    '</section>' +
-                    '<div id="coach-modal-root" class="coach-modal-backdrop" aria-hidden="true">' +
-                        '<article class="coach-modal" role="dialog" aria-modal="true" aria-labelledby="coach-modal-title">' +
-                            '<header class="coach-modal-head">' +
-                                '<h3 id="coach-modal-title">Reponse du Prof IA</h3>' +
-                                '<button id="coach-modal-close-x" class="ghost" aria-label="Fermer">Fermer</button>' +
-                            '</header>' +
-                            '<div id="coach-modal-content" class="coach-modal-content math-content"></div>' +
-                            '<footer class="coach-modal-actions">' +
-                                '<button id="coach-modal-save-essential" class="secondary" style="display:none;">Sauver dans Petits cours</button>' +
-                                '<button id="coach-modal-copy" class="secondary">Copier</button>' +
-                                '<button id="coach-modal-close">Fermer</button>' +
-                            '</footer>' +
-                        '</article>' +
-                    '</div>' +
-                '</div>';
+                        '<section class="coach-grid ' + (mobileListOpen ? 'show-mobile-list' : 'hide-mobile-list') + '">' +
+                            '<aside class="list-card coach-list">' +
+                                '<div class="coach-list-head">' +
+                                    '<h2>Exercices</h2>' +
+                                    '<button id="coach-close-list" class="ghost mobile-only">Continuer</button>' +
+                                '</div>' +
+                                '<div class="exercise-list">' + exercises.map(function (ex) {
+                                    return '<div class="exercise-item ' + (ex.id === active.id ? 'active' : '') + '" data-coach-ex="' + ex.id + '">' +
+                                        '<h3>' + App.UI.escapeHtml(ex.title || 'Exercice') + '</h3>' +
+                                        '<div class="exercise-meta"><div>' + App.UI.escapeHtml(ex.subject || 'Autre') + ' · ' + App.UI.escapeHtml(ex.topic || App.ExerciseStore.defaultTopic()) + '</div><div>' + App.UI.formatDate(ex.updatedAt || ex.createdAt) + '</div></div>' +
+                                    '</div>';
+                                }).join('') + '</div>' +
+                            '</aside>' +
+                            '<section class="editor-card coach-workspace">' +
+                                '<button id="coach-open-list" class="ghost mobile-only">Changer d\'exercice</button>' +
+                                '<h2>' + App.UI.escapeHtml(active.title || 'Exercice') + '</h2>' +
+                                '<div class="chip-row">' +
+                                    App.UI.badge(active.subject || 'Autre') +
+                                    App.UI.badge(active.gradeLevel || 'Niveau libre') +
+                                    App.UI.badge(active.difficulty || 'Moyen') +
+                                '</div>' +
+                                '<div class="statement-tools"><h3>Enonce</h3>' + App.UI.sourceDocumentButton(sourceScan, 'Document fourni') + '</div>' +
+                                '<div class="ocr-output math-content" id="coach-statement">' + App.UI.statementHtml(active.statement || '', sourceScan) + '</div>' +
+                                '<label>Ma tentative' +
+                                    '<textarea id="coach-attempt" rows="7" placeholder="Ecris ici ton raisonnement, calculs, et ou tu bloques...">' + App.UI.escapeHtml(attempt) + '</textarea>' +
+                                '</label>' +
+                                '<div class="coach-actions">' +
+                                    '<button data-coach-action="explain" class="secondary">Expliquer l\'enonce</button>' +
+                                    '<button data-coach-action="hint" class="secondary">Donner un indice</button>' +
+                                    '<button data-coach-action="method" class="secondary">Donner la methode</button>' +
+                                    '<button data-coach-action="review">Corriger ma tentative</button>' +
+                                '</div>' +
+                                (isVariant ? '<div class="coach-question-actions"><button id="coach-save-variant-inline" class="secondary">Sauver la variante</button></div>' : '') +
+                                '<label>Question libre (optionnel)' +
+                                    '<textarea id="coach-question" rows="3" placeholder="Ex: pourquoi je dois factoriser avant de developper ?"></textarea>' +
+                                '</label>' +
+                                '<div class="coach-question-actions">' +
+                                    '<button data-coach-action="custom" class="secondary">Envoyer la question</button>' +
+                                    '<button data-coach-preset-question="Explique moi l\'enonce, je comprends pas tout" class="ghost">Explique moi l\'enonce, je comprends pas tout</button>' +
+                                    '<small class="muted">Raccourci: Ctrl+Entrée</small>' +
+                                '</div>' +
+                                '<section class="mini-course-corner">' +
+                                    '<div class="coach-list-head">' +
+                                        '<h3>Coin petits cours</h3>' +
+                                        '<small class="muted">' + miniCourses.length + ' sauvegarde(s)</small>' +
+                                    '</div>' +
+                                    renderMiniCourses(miniCourses) +
+                                '</section>' +
+                                '<div id="coach-chat" class="coach-chat">' + renderChat(chat) + '</div>' +
+                            '</section>' +
+                        '</section>' +
+                        '<div id="coach-modal-root" class="coach-modal-backdrop" aria-hidden="true">' +
+                            '<article class="coach-modal" role="dialog" aria-modal="true" aria-labelledby="coach-modal-title">' +
+                                '<header class="coach-modal-head">' +
+                                    '<h3 id="coach-modal-title">Reponse du Prof IA</h3>' +
+                                    '<button id="coach-modal-close-x" class="ghost" aria-label="Fermer">Fermer</button>' +
+                                '</header>' +
+                                '<div id="coach-modal-content" class="coach-modal-content math-content"></div>' +
+                                '<footer class="coach-modal-actions">' +
+                                    '<button id="coach-modal-save-essential" class="secondary" style="display:none;">Sauver dans Petits cours</button>' +
+                                    '<button id="coach-modal-copy" class="secondary">Copier</button>' +
+                                    '<button id="coach-modal-close">Fermer</button>' +
+                                '</footer>' +
+                            '</article>' +
+                        '</div>' +
+                    '</div>';
 
-            bindEvents(container, exercises, active, chat, miniCourses);
-            App.UI.renderMath(container);
+                App.UI.bindDocumentViewer(container);
+                bindEvents(container, exercises, active, chat, miniCourses);
+                App.UI.renderMath(container);
 
-            var pendingAction = localStorage.getItem(PENDING_ACTION_KEY);
-            var pendingExercise = localStorage.getItem(PENDING_EXERCISE_KEY);
-            if (pendingAction === 'essential' && pendingExercise === active.id) {
-                localStorage.removeItem(PENDING_ACTION_KEY);
-                localStorage.removeItem(PENDING_EXERCISE_KEY);
-                window.setTimeout(function () {
-                    if (window.__exophotoCoachRunAction) {
-                        window.__exophotoCoachRunAction('essential');
-                    }
-                }, 0);
-            }
+                var pendingAction = localStorage.getItem(PENDING_ACTION_KEY);
+                var pendingExercise = localStorage.getItem(PENDING_EXERCISE_KEY);
+                if (pendingAction === 'essential' && pendingExercise === active.id) {
+                    localStorage.removeItem(PENDING_ACTION_KEY);
+                    localStorage.removeItem(PENDING_EXERCISE_KEY);
+                    window.setTimeout(function () {
+                        if (window.__exophotoCoachRunAction) {
+                            window.__exophotoCoachRunAction('essential');
+                        }
+                    }, 0);
+                }
+            });
         });
     }
 
